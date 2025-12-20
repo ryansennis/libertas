@@ -1,32 +1,22 @@
-from enum import Enum
-
-from litellm import Reasoning
 import mesa
 
 from mesa_llm.llm_agent import LLMAgent
-from mesa_llm.memory.st_lt_memory import STLTMemory
+from mesa_llm.memory.st_lt_memory import Memory
+from mesa_llm.reasoning.reasoning import Reasoning
 from mesa_llm.tools.tool_manager import ToolManager
 
-worker_tool_manager = ToolManager()
-
-class WorkerState(Enum):
-    QUIET = 1
-    ACTIVE = 2
-    ARRESTED = 3
-
 class Worker(LLMAgent):
-    """
-    """
-
     def __init__(
-        self,
+        self: 'Worker',
         model: mesa.Model,
-        reasoning: str,
+        reasoning: type[Reasoning],
         llm_model: str,
-        system_prompt: str,
-        vision: float,
-        internal_state: list[str],
-        step_prompt: str
+        tool_manager = ToolManager,
+        system_prompt: str | None = None,
+        vision: float | None = None,
+        internal_state: list[str] | str | None = None,
+        step_prompt: str | None = None,
+        memory: Memory | None = None,
     ):
         super().__init__(
             model=model,
@@ -38,14 +28,8 @@ class Worker(LLMAgent):
             step_prompt=step_prompt,
         )
 
-        self.memory = STLTMemory(
-            agent=self,
-            display=True,
-            llm_model=llm_model,
-        )
-
-        self.tool_manager = worker_tool_manager
-        self.system_prompt = ""
+        self.memory = memory
+        self.tool_manager = tool_manager
 
     def step(self) -> None:
         return
