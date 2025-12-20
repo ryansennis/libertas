@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=65", "wheel", "Cython>=0.29"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "libertas"
+version = "0.1.0"
+description = "Libertas - Agent-based modeling of organizational structures."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Ryan Ennis", email = "ryansennis@hotmail.com" }]
+dependencies = [
+    "numpy>=1.24",
+    "plotly>=6.5.0",
+    "scipy>=1.16.3",
+    "mesa>=3.0",
+    "mesa-llm>=0.1.1",
+    "pydantic>=2.0",
+    "pyyaml>=6.0.3",
+]
+
+[project.optional-dependencies]
+notebooks = [
+    "nbformat>=4.2.0",
+    "ipykernel>=7.1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["libertas*"]
+exclude = ["tests*", "examples*", "docs*", "notebooks*"]
+
+[project.urls]
+Homepage = "https://github.com/ryansennis/libertas"
+Repository = "https://github.com/ryansennis/libertas"
+Issues = "https://github.com/ryansennis/libertas/issues"
