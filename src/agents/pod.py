@@ -1,15 +1,81 @@
+'''
+    Pod Model
+'''
+from typing import List, Optional, Dict, Any
+
+import networkx as nx
 import mesa
+from mesa_llm.llm_agent import LLMAgent
+from mesa_llm.memory.st_lt_memory import Memory
+from mesa_llm.reasoning.reasoning import Reasoning
+from mesa_llm.tools.tool_manager import ToolManager
 
 from .worker import Worker
 
-class Pod(mesa.Agent):
+class Pod(LLMAgent):
+    '''
+        Pod Model
+    '''
     def __init__(
         self: 'Pod',
         model: mesa.Model,
-        workers: list[Worker],
-        *args,
-        **kwargs
-    ) -> None:
-        super().__init__(model, *args, **kwargs)
+        reasoning: type[Reasoning],
+        llm_model: str,
+        tool_manager = ToolManager,
+        system_prompt: Optional[str] = None,
+        vision: Optional[float] = None,
+        internal_state: Optional[list[str]] | str = None,
+        step_prompt: Optional[str] = None,
+        memory: Optional[Memory] = None,
+    ):
+        super().__init__(
+            model=model,
+            reasoning=reasoning,
+            llm_model=llm_model,
+            system_prompt=system_prompt,
+            vision=vision,
+            internal_state=internal_state,
+            step_prompt=step_prompt,
+        )
 
-        self.workers = workers
+        self.memory = memory
+        self.tool_manager = tool_manager
+
+        self.resources = {}
+        self.task_queue = []
+
+        self.max_workers = 0
+        self.min_workers = 0
+        self.current_workers = 0
+
+        self.network_grid = None
+
+    def setup_pod(
+        self: 'Pod',
+        resources: Dict[str, Any],
+        workers: List[Worker],
+        max_workers: int = 12,
+        min_workers: int = 3,
+    ) -> None:
+        '''
+        Docstring for setup_pod
+        '''
+        self.resources = resources
+
+        worker_graph = nx.Graph()
+        for worker in workers:
+            worker_graph.add_node(worker.unique_id)
+
+        for i, worker1 in enumerate(workers):
+            for worker2 in workers[i + 1 :]:
+                worker_graph.add_edge(worker1.unique_id, worker2.unique_id)
+
+        self.network_grid = mesa.space.NetworkGrid(worker_graph)
+
+        for worker in workers:
+            self.network_grid.place_agent(worker, worker.unique_id)
+
+
+        self.max_workers = max_workers
+        self.min_workers = min_workers
+        self.current_workers = len(workers)

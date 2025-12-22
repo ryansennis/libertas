@@ -1,3 +1,6 @@
+'''
+    Worker Agent
+'''
 import mesa
 
 from mesa_llm.llm_agent import LLMAgent
@@ -6,6 +9,9 @@ from mesa_llm.reasoning.reasoning import Reasoning
 from mesa_llm.tools.tool_manager import ToolManager
 
 class Worker(LLMAgent):
+    '''
+    Docstring for Worker
+    '''
     def __init__(
         self: 'Worker',
         model: mesa.Model,
