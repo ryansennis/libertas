@@ -1,7 +1,9 @@
 '''
     Worker Agent
 '''
+from typing import List, Optional, Union
 import mesa
+import json
 
 from mesa_llm.llm_agent import LLMAgent
 from mesa_llm.memory.st_lt_memory import Memory
@@ -17,12 +19,11 @@ class Worker(LLMAgent):
         model: mesa.Model,
         reasoning: type[Reasoning],
         llm_model: str,
-        tool_manager = ToolManager,
-        system_prompt: str | None = None,
-        vision: float | None = None,
-        internal_state: list[str] | str | None = None,
-        step_prompt: str | None = None,
-        memory: Memory | None = None,
+        system_prompt: Optional[str] = None,
+        vision: Optional[float] = None,
+        internal_state: Optional[Union[List[str], str]] = None,
+        memory: Optional[Memory] = None,
+        tool_manager: Optional[ToolManager] = None
     ):
         super().__init__(
             model=model,
@@ -30,12 +31,56 @@ class Worker(LLMAgent):
             llm_model=llm_model,
             system_prompt=system_prompt,
             vision=vision,
-            internal_state=internal_state,
-            step_prompt=step_prompt,
+            internal_state=internal_state
         )
 
-        self.memory = memory
-        self.tool_manager = tool_manager
+        if isinstance(memory, Memory):
+            self.memory = memory
+
+        if isinstance(tool_manager, ToolManager):
+            self.tool_manager = tool_manager
+        
+        self.last_llm_output = ""
+        self.pod_id = 0
+
+    def _generate_step_prompt(self) -> str:
+        observation = self.generate_obs()
+
+        prompt = f"""
+            You are Worker {self.unique_id} in Pod {self.pod_id}.
+
+            It is day {observation.step}.
+
+            SELF CONTEXT:
+            {observation.self_state}
+
+            LOCAL CONTEXT:
+            {observation.local_state}
+
+            POD SITUATION:
+            Pod members: {getattr(self.model, 'workers', lambda _: [])(self.pod_id)}
+            Pending tasks: {getattr(self.model, 'task_queue', lambda _: [])(self.pod_id)}
+
+            CONSTITUTION RULES:
+            {getattr(self.model, 'constitution', lambda _: [])}
+
+            Make a decision. Consider:
+            1. What matches your skills and current state?
+            2. What helps your pod?
+            3. What aligns with the constitution?
+            4. What maintains your well-being?
+            """
+
+        return prompt
 
     def step(self) -> None:
-        return
+        prompt = str(self.system_prompt) + self._generate_step_prompt()
+
+        self.last_llm_output = self.llm.generate(
+            prompt=prompt,
+            tool_schema=[],
+            tool_choice="auto",
+            response_format={}
+        )
+
+

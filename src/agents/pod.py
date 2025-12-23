@@ -1,7 +1,7 @@
 '''
     Pod Model
 '''
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Union
 
 import networkx as nx
 import mesa
@@ -21,12 +21,12 @@ class Pod(LLMAgent):
         model: mesa.Model,
         reasoning: type[Reasoning],
         llm_model: str,
-        tool_manager = ToolManager,
         system_prompt: Optional[str] = None,
         vision: Optional[float] = None,
-        internal_state: Optional[list[str]] | str = None,
+        internal_state: Optional[Union[List[str], str]] = None,
         step_prompt: Optional[str] = None,
         memory: Optional[Memory] = None,
+        tool_manager: Optional[ToolManager] = None,
     ):
         super().__init__(
             model=model,
@@ -38,17 +38,20 @@ class Pod(LLMAgent):
             step_prompt=step_prompt,
         )
 
-        self.memory = memory
-        self.tool_manager = tool_manager
+        if isinstance(memory, Memory):
+            self.memory = memory
+
+        if isinstance(tool_manager, ToolManager):
+            self.tool_manager = tool_manager
 
         self.resources = {}
         self.task_queue = []
 
+        self.workers: List[Worker] = []
         self.max_workers = 0
         self.min_workers = 0
-        self.current_workers = 0
 
-        self.network_grid = None
+        self.network_grid: Optional[mesa.space.NetworkGrid] = None
 
     def setup_pod(
         self: 'Pod',
@@ -63,6 +66,7 @@ class Pod(LLMAgent):
         self.resources = resources
 
         worker_graph = nx.Graph()
+
         for worker in workers:
             worker_graph.add_node(worker.unique_id)
 
@@ -73,9 +77,13 @@ class Pod(LLMAgent):
         self.network_grid = mesa.space.NetworkGrid(worker_graph)
 
         for worker in workers:
+            worker.pod_id = self.unique_id
+            self.workers.append(worker)
             self.network_grid.place_agent(worker, worker.unique_id)
-
 
         self.max_workers = max_workers
         self.min_workers = min_workers
-        self.current_workers = len(workers)
+    
+    def step(self) -> None:
+        for worker in self.workers:
+            worker.step()
