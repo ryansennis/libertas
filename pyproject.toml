@@ -28,7 +28,6 @@ notebooks = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["libertas*"]
 exclude = ["tests*", "examples*", "docs*", "notebooks*"]
 
 [project.urls]
