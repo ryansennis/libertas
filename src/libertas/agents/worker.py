@@ -3,7 +3,6 @@
 '''
 from typing import List, Optional, Union
 import mesa
-import json
 
 from mesa_llm.llm_agent import LLMAgent
 from mesa_llm.memory.st_lt_memory import Memory
@@ -77,10 +76,9 @@ class Worker(LLMAgent):
         prompt = str(self.system_prompt) + self._generate_step_prompt()
 
         self.last_llm_output = self.llm.generate(
-            prompt=prompt,
-            tool_schema=[],
-            tool_choice="auto",
-            response_format={}
+            prompt
         )
+
+        print(self.last_llm_output)
 
 
