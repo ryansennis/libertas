@@ -487,5 +487,102 @@ class TestGovernanceToolDefinitions(unittest.TestCase):
         assert "abstain" in choice_param["enum"]
 
 
+@pytest.mark.unit
+class TestGovernanceToolsEdgeCases(unittest.TestCase):
+    """Test edge cases and coverage gaps."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        # Create workers in different pods
+        worker_config1 = WorkerConfig(
+            name="Alice",
+            reasoning=Mock,
+            llm_model=LLM_MODEL
+        )
+        worker_config2 = WorkerConfig(
+            name="Bob",
+            reasoning=Mock,
+            llm_model=LLM_MODEL
+        )
+
+        pod_config1 = PodConfig(name="PodA", workers=[worker_config1])
+        pod_config2 = PodConfig(name="PodB", workers=[worker_config2])
+
+        self.federation = Federation(pods=[pod_config1, pod_config2])
+        self.federation.steps = 100
+
+        pod_a = list(self.federation)[0]
+        pod_b = list(self.federation)[1]
+        self.alice = list(pod_a)[0]
+        self.bob = list(pod_b)[0]
+
+    def test_list_active_motions_filters_by_scope(self):
+        """Test that list_active_motions filters by scope correctly (line 104)."""
+        # Create federation motion
+        self.alice.governance_tools.propose_motion(
+            "Federation Motion",
+            "For all",
+            scope="federation"
+        )
+
+        # Create pod-specific motion
+        self.alice.governance_tools.propose_motion(
+            "Pod A Motion",
+            "For Pod A only",
+            scope="pod"
+        )
+
+        # Bob lists federation motions only
+        result = self.bob.governance_tools.list_active_motions("federation")
+        result_dict = json.loads(result)
+
+        # Should only see federation motion
+        assert result_dict["count"] == 1
+        assert result_dict["active_motions"][0]["scope"] == "federation"
+
+    def test_list_active_motions_filters_eligible_voters(self):
+        """Test that list_active_motions filters by eligible voters (line 108)."""
+        # Alice creates a pod-specific motion (only Pod A can vote)
+        self.alice.governance_tools.propose_motion(
+            "Pod A Only",
+            "Only Pod A members",
+            scope="pod"
+        )
+
+        # Bob (from Pod B) should not see it
+        result = self.bob.governance_tools.list_active_motions("all")
+        result_dict = json.loads(result)
+
+        # Bob should not see Alice's pod-specific motion
+        assert result_dict["count"] == 0
+
+    def test_list_active_motions_with_multiple_scopes(self):
+        """Test listing motions with federation and pod scopes (covers lines 104, 108)."""
+        # Create federation motion (all can see)
+        motion1_result = self.alice.governance_tools.propose_motion(
+            "Federation Wide",
+            "Everyone can vote",
+            scope="federation"
+        )
+
+        # Create pod-specific motion (only Pod A)
+        motion2_result = self.alice.governance_tools.propose_motion(
+            "Pod A Only",
+            "Pod A specific",
+            scope="pod"
+        )
+
+        # Alice (Pod A) should see both when listing "all"
+        result = self.alice.governance_tools.list_active_motions("all")
+        result_dict = json.loads(result)
+        assert result_dict["count"] == 2
+
+        # Bob (Pod B) should only see federation motion
+        result = self.bob.governance_tools.list_active_motions("all")
+        result_dict = json.loads(result)
+        assert result_dict["count"] == 1
+        assert result_dict["active_motions"][0]["scope"] == "federation"
+
+
 if __name__ == "__main__":
     unittest.main()

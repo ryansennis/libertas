@@ -305,8 +305,38 @@ class TestResourceEdgeCases(unittest.TestCase):
         registry = ResourceRegistry()
         registry.register(Resource(name="unique"))
         registry.register(Resource(name="unique"))  # Should not duplicate
-        
+
         self.assertEqual(len(registry.list_resources()), 1)
+
+    def test_resource_with_rarity_property(self):
+        """Test resource value calculation with rarity property."""
+        resource = Resource(
+            name="rare_gem",
+            base_value=50.0,
+            properties={"rarity": 2.0}  # 2x multiplier
+        )
+
+        # Value should be base_value * (1 + rarity)
+        # 50 * (1 + 2.0) = 150
+        self.assertEqual(resource.get_value(), 150.0)
+
+    def test_resource_with_quality_and_rarity(self):
+        """Test resource with both quality and rarity properties."""
+        resource = Resource(
+            name="premium_item",
+            base_value=100.0,
+            properties={"quality": 0.8, "rarity": 1.5}
+        )
+
+        # Value = base * (0.5 + quality) * (1 + rarity)
+        # 100 * (0.5 + 0.8) * (1 + 1.5) = 100 * 1.3 * 2.5 = 325
+        self.assertEqual(resource.get_value(), 325.0)
+
+    def test_use_tool_on_non_tool(self):
+        """Test that use_tool returns False for regular resources."""
+        resource = Resource(name="wood", base_value=10.0, is_tool=False)
+
+        self.assertFalse(resource.use_tool())
 
 
 if __name__ == '__main__':
