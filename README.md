@@ -33,8 +33,8 @@ cd libertas
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install with development dependencies
-pip install -e ".[dev]"
+# Install with all dependencies (dev + test)
+pip install -e ".[all]"
 ```
 
 ### Basic Usage
@@ -103,15 +103,6 @@ python scripts/test.py --integration
 ```
 
 See [scripts/README.md](scripts/README.md) for detailed testing documentation.
-
-### Test Summary
-
-- **310 Unit Tests**: Fast, isolated component tests
-- **19 Integration Tests**: Component interaction tests
-- **5 E2E Tests**: Complete simulation scenarios
-
-**Total: 334 tests**
-**Coverage: 93.07%** 🎯
 
 ## Architecture
 
