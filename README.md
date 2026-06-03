@@ -3,7 +3,7 @@
 [![Test Suite](https://github.com/ryansennis/libertas/actions/workflows/test.yml/badge.svg)](https://github.com/ryansennis/libertas/actions/workflows/test.yml)
 [![Coverage](https://img.shields.io/badge/coverage-91.54%25-brightgreen)](https://github.com/ryansennis/libertas/actions/workflows/test.yml)
 [![Tests](https://img.shields.io/badge/tests-259%20passing-brightgreen)](https://github.com/ryansennis/libertas/actions/workflows/test.yml)
-[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Agent-based modeling of organizational structures for economic democracy research.
