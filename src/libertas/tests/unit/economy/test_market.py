@@ -416,6 +416,35 @@ class TestMarketEdgeCases(unittest.TestCase):
         # No price info, so no trades
         self.assertEqual(len(transactions), 0)
 
+    def test_process_market_mismatched_resources(self):
+        """Test that orders for different resources don't match."""
+        # Register both resources
+        self.market.register_resource("wood", 10.0)
+        self.market.register_resource("metal", 20.0)
+
+        # Create orders for different resources
+        self.market.place_order("w1", "pod_001", "wood", 100.0, 10.0, "sell", 100)
+        self.market.place_order("w2", "pod_002", "metal", 50.0, 20.0, "buy", 100)
+
+        # Inventories
+        inventories = {
+            "pod_001": {"wood": 100.0},
+            "pod_002": {"metal": 0.0}
+        }
+
+        def get_inventory(pod_id, resource_name):
+            return inventories.get(pod_id, {}).get(resource_name, 0.0)
+
+        def set_inventory(pod_id, resource_name, quantity):
+            if pod_id not in inventories:
+                inventories[pod_id] = {}
+            inventories[pod_id][resource_name] = quantity
+
+        transactions = self.market.process_market(101, get_inventory, set_inventory)
+
+        # No trades should occur - different resources
+        self.assertEqual(len(transactions), 0)
+
 
 if __name__ == '__main__':
     unittest.main()

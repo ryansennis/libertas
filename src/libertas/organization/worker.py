@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from .federation import Federation
     from ..economy import ProductionJob, Resource
 
+from ..cognitive import PersonalityTraits, Background, MoodState
+
 @dataclass
 class WorkerConfig:
     name: str
@@ -25,7 +27,9 @@ class WorkerConfig:
     api_base: Optional[str] = None
     initial_skills: Optional[Dict[str, float]] = None
     initial_tools: Optional[List[str]] = None
-    initial_currency: float = 100.0  
+    initial_currency: float = 100.0
+    personality: Optional[PersonalityTraits] = None
+    background: Optional[Background] = None  
 
     @property
     def llm_inputs(self):
@@ -150,24 +154,52 @@ class Worker(LLMAgent):
                 if tool_template and tool_template.is_tool:
                     self._add_tool(tool_template)
         
+        # Cognitive attributes
+        self.personality = worker_config.personality or PersonalityTraits()
+        self.background = worker_config.background or Background()
+        self.mood = MoodState()
+
+        # Memory systems
+        self.episodic_memory: List[Dict] = []  # Recent experiences (observations + mood)
+        self.current_goals: List[str] = []  # Current goals (e.g., ["earn_currency", "vote_on_motions"])
+
         # Initialize economic tools
         from ..tools.economic_tools import EconomicTools
         self.economic_tools = EconomicTools(self)
-        
+
+        # Initialize governance tools
+        from ..tools.governance_tools import GovernanceTools
+        self.governance_tools = GovernanceTools(self)
+
         # Register tools with LLMAgent's tool manager
         self._register_economic_tools()
+        self._register_governance_tools()
     
     def _register_economic_tools(self):
         """Register economic tools with the LLM agent's tool manager."""
         from ..tools.economic_tools import get_economic_tool_definitions
-        
+
         # Get tool definitions
         tool_defs = get_economic_tool_definitions()
-        
+
         # Register each tool with the tool manager
         for tool_def in tool_defs:
             tool_name = tool_def['function']['name']
             tool_func = getattr(self.economic_tools, tool_name, None)
+            if tool_func:
+                self.tool_manager.register(tool_func)
+
+    def _register_governance_tools(self):
+        """Register governance tools with the LLM agent's tool manager."""
+        from ..tools.governance_tools import get_governance_tool_definitions
+
+        # Get tool definitions
+        tool_defs = get_governance_tool_definitions()
+
+        # Register each tool with the tool manager
+        for tool_def in tool_defs:
+            tool_name = tool_def['function']['name']
+            tool_func = getattr(self.governance_tools, tool_name, None)
             if tool_func:
                 self.tool_manager.register(tool_func)
     
@@ -438,3 +470,374 @@ class Worker(LLMAgent):
             'total_outputs': self.total_outputs.copy(),
             'transaction_history': self.transaction_history.copy()
         }
+
+    # ===== Cognitive Loop Methods =====
+
+    def observe_and_reason(self) -> Dict:
+        """
+        Main cognitive loop: observe environment, reason about situation, decide actions.
+
+        Returns:
+            Dict with observations, reasoning, and actions
+        """
+        # 1. Gather observations
+        observations = {
+            "local_workers": self._observe_local_workers(),
+            "pod_state": self._observe_pod_state(),
+            "market_state": self._observe_market(),
+            "active_motions": self._observe_active_votes(),
+            "my_permissions": self._check_permissions()
+        }
+
+        # 2. Update memory and mood
+        self._update_memory(observations)
+        self._update_mood_from_observations(observations)
+
+        # 3. Reason about situation (using LLM)
+        reasoning = self._reason_about_situation(observations)
+
+        # 4. Decide on actions based on reasoning and permissions
+        actions = self._decide_actions(reasoning)
+
+        return {
+            "observations": observations,
+            "reasoning": reasoning,
+            "actions": actions
+        }
+
+    def _observe_local_workers(self, radius: float = 5.0) -> Dict:
+        """Observe nearby workers and their activities."""
+        if not self.pod:
+            return {"workers": [], "count": 0}
+
+        nearby_workers = []
+        for worker in self.pod:
+            if worker == self:
+                continue
+
+            # Calculate distance
+            distance = self._calculate_distance(self.coordinate, worker.coordinate)
+            if distance <= radius:
+                nearby_workers.append({
+                    "name": worker.name,
+                    "distance": round(distance, 2),
+                    "current_job": worker.current_job.recipe.name if worker.current_job else None,
+                    "equipped_tool": worker.equipped_tool,
+                    "mood": {
+                        "happiness": round(worker.mood.happiness, 2),
+                        "stress": round(worker.mood.stress, 2)
+                    }
+                })
+
+        return {"workers": nearby_workers, "count": len(nearby_workers)}
+
+    def _observe_pod_state(self) -> Dict:
+        """Observe current pod inventory and production status."""
+        if not self.pod:
+            return {"error": "Not in a pod"}
+
+        return {
+            "inventory": dict(self.pod.inventory.quantities),
+            "active_jobs": len(self.pod.active_jobs),
+            "workers_count": self.pod.num_workers(),
+            "available_recipes": self.federation.list_recipes() if self.federation else []
+        }
+
+    def _observe_market(self) -> Dict:
+        """Observe current market prices and activity."""
+        if not hasattr(self.federation, 'market') or not self.federation.market:
+            return {"error": "No market available"}
+
+        market = self.federation.market
+        # Convert MarketPrice objects to floats for serialization
+        prices_dict = {resource: price.current_price for resource, price in market.prices.items()}
+        return {
+            "prices": prices_dict,
+            "order_counts": {
+                "buy": len([o for o in market.orders if o.order_type == "buy"]),
+                "sell": len([o for o in market.orders if o.order_type == "sell"])
+            }
+        }
+
+    def _observe_active_votes(self) -> Dict:
+        """Observe active motions that require voting."""
+        if not hasattr(self.federation, 'governance') or not self.federation.governance:
+            return {"active_motions": [], "count": 0}
+
+        governance = self.federation.governance
+        relevant_motions = []
+
+        for motion in governance.active_motions.values():
+            if self.unique_id in motion.eligible_voters:
+                relevant_motions.append({
+                    "motion_id": motion.motion_id,
+                    "title": motion.title,
+                    "description": motion.description,
+                    "type": motion.motion_type.name,
+                    "votes_for": len(motion.votes_for),
+                    "votes_against": len(motion.votes_against),
+                    "voting_ends": motion.voting_ends_step
+                })
+
+        return {"active_motions": relevant_motions, "count": len(relevant_motions)}
+
+    def _check_permissions(self) -> Dict[str, bool]:
+        """Check what actions are currently permitted."""
+        permissions = {}
+
+        if not self.federation:
+            return permissions
+
+        # Federation permissions
+        fed_const = self.federation.constitution
+        permissions["can_vote"] = fed_const.check_permission(self, "vote")[0]
+        permissions["can_propose"] = fed_const.check_permission(self, "propose_motion")[0]
+        permissions["can_create_pod"] = fed_const.check_permission(self, "create_pod")[0]
+
+        # Pod permissions
+        if self.pod:
+            pod_const = self.pod.constitution
+            permissions["can_start_production"] = pod_const.check_permission(self, "start_production")[0]
+
+        return permissions
+
+    def _calculate_distance(self, coord1: tuple, coord2: tuple) -> float:
+        """Calculate Euclidean distance between two coordinates."""
+        import math
+        return math.sqrt((coord1[0] - coord2[0])**2 + (coord1[1] - coord2[1])**2)
+
+    def _reason_about_situation(self, observations: Dict) -> Dict:
+        """Use LLM to reason about current situation."""
+        # Build context from observations and cognitive state
+        context = {
+            "personality": {
+                "openness": self.personality.openness,
+                "conscientiousness": self.personality.conscientiousness,
+                "economic_lean": self.personality.economic_left_right,
+                "authority_lean": self.personality.authority_libertarian
+            },
+            "background": {
+                "education": self.background.education_level,
+                "experience": self.background.years_experience,
+                "specializations": self.background.specializations
+            },
+            "mood": {
+                "happiness": self.mood.happiness,
+                "stress": self.mood.stress,
+                "motivation": self.mood.motivation
+            },
+            "observations": observations,
+            "current_goals": self.current_goals
+        }
+
+        # Construct reasoning prompt
+        prompt = self._build_reasoning_prompt(context)
+
+        # Use LLM reasoning (via mesa_llm)
+        try:
+            response = self.reasoning.plan(agent=self, prompt=prompt)
+            return self._parse_llm_response(response)
+        except Exception as e:
+            return {
+                "error": str(e),
+                "concerns": [],
+                "opportunities": [],
+                "recommended_actions": []
+            }
+
+    def _build_reasoning_prompt(self, context: Dict) -> str:
+        """Build prompt for LLM reasoning."""
+        pod_name = self.pod.name if self.pod else "no pod"
+
+        # Determine personality descriptions
+        econ_lean = context['personality']['economic_lean']
+        auth_lean = context['personality']['authority_lean']
+
+        econ_desc = "collectivist" if econ_lean < 0 else "individualist"
+        auth_desc = "hierarchical" if auth_lean < 0 else "libertarian"
+
+        return f"""You are {self.name}, a worker in {pod_name}.
+
+PERSONALITY:
+- Economic lean: {econ_desc} ({econ_lean:.2f})
+- Authority view: {auth_desc} ({auth_lean:.2f})
+- Openness: {context['personality']['openness']:.2f}
+- Conscientiousness: {context['personality']['conscientiousness']:.2f}
+
+CURRENT STATE:
+- Happiness: {context['mood']['happiness']:.2f}
+- Stress: {context['mood']['stress']:.2f}
+- Motivation: {context['mood']['motivation']:.2f}
+- Currency: {self.currency:.2f}
+
+SITUATION:
+- Pod inventory: {context['observations']['pod_state'].get('inventory', {})}
+- Market prices: {context['observations']['market_state'].get('prices', {})}
+- Active votes: {len(context['observations']['active_motions'].get('active_motions', []))}
+- Nearby workers: {context['observations']['local_workers'].get('count', 0)}
+
+Based on your personality and situation, answer:
+1. What concerns you most right now?
+2. What opportunities do you see?
+3. What actions would you take next? (vote, produce, trade, propose motion)
+
+Respond in JSON format:
+{{
+  "concerns": ["concern1", "concern2"],
+  "opportunities": ["opp1", "opp2"],
+  "recommended_actions": [
+    {{"action": "vote", "motion_id": "M001", "choice": "for", "reason": "..."}},
+    {{"action": "produce", "recipe": "make_planks", "reason": "..."}}
+  ]
+}}
+"""
+
+    def _parse_llm_response(self, response: str) -> Dict:
+        """Parse LLM response into structured format."""
+        import json
+        try:
+            # Extract JSON from response
+            if "```json" in response:
+                start = response.find("```json") + 7
+                end = response.find("```", start)
+                json_str = response[start:end].strip()
+            elif "```" in response:
+                start = response.find("```") + 3
+                end = response.find("```", start)
+                json_str = response[start:end].strip()
+            else:
+                json_str = response.strip()
+
+            return json.loads(json_str)
+        except:
+            return {
+                "concerns": ["Unable to parse reasoning"],
+                "opportunities": [],
+                "recommended_actions": []
+            }
+
+    def _decide_actions(self, reasoning: Dict) -> List[Dict]:
+        """Filter recommended actions based on permissions and feasibility."""
+        actions = []
+        permissions = self._check_permissions()
+
+        for action in reasoning.get("recommended_actions", []):
+            action_type = action.get("action")
+
+            # Check if action is permitted
+            if action_type == "vote" and permissions.get("can_vote"):
+                actions.append(action)
+            elif action_type == "produce" and permissions.get("can_start_production"):
+                actions.append(action)
+            elif action_type == "propose" and permissions.get("can_propose"):
+                actions.append(action)
+            elif action_type in ["buy", "sell", "trade"]:
+                # Market actions don't require special permissions
+                actions.append(action)
+
+        return actions
+
+    def _update_memory(self, observations: Dict):
+        """Update episodic memory with observations."""
+        current_step = self.federation.steps if self.federation else 0
+
+        memory_entry = {
+            "step": current_step,
+            "observations": observations,
+            "mood": {
+                "happiness": self.mood.happiness,
+                "stress": self.mood.stress,
+                "motivation": self.mood.motivation
+            }
+        }
+
+        self.episodic_memory.append(memory_entry)
+
+        # Keep only last 100 memories
+        if len(self.episodic_memory) > 100:
+            self.episodic_memory = self.episodic_memory[-100:]
+
+    def _update_mood_from_observations(self, observations: Dict):
+        """Update mood based on environmental observations."""
+        # Currency changes affect happiness
+        if self.currency > 500:
+            self.mood.happiness = min(1.0, self.mood.happiness + 0.01)
+        elif self.currency < 100:
+            self.mood.happiness = max(0.0, self.mood.happiness - 0.01)
+            self.mood.stress = min(1.0, self.mood.stress + 0.02)
+
+        # Active work reduces stress slightly
+        if self.current_job:
+            self.mood.stress = max(0.0, self.mood.stress - 0.005)
+            self.mood.motivation = min(1.0, self.mood.motivation + 0.005)
+
+        # Lots of nearby workers affects mood based on extraversion
+        nearby_count = observations.get("local_workers", {}).get("count", 0)
+        if nearby_count > 3:
+            # Extraverts like many people, introverts prefer fewer
+            if self.personality.extraversion > 0.6:
+                self.mood.happiness = min(1.0, self.mood.happiness + 0.01)
+            elif self.personality.extraversion < 0.4:
+                self.mood.stress = min(1.0, self.mood.stress + 0.01)
+
+        # Active motions increase engagement for politically active workers
+        motion_count = observations.get("active_motions", {}).get("count", 0)
+        if motion_count > 0:
+            # Libertarians more motivated by governance participation
+            if abs(self.personality.authority_libertarian) > 0.5:
+                self.mood.motivation = min(1.0, self.mood.motivation + 0.01)
+
+    def execute_actions(self, actions: List[Dict]) -> List[Dict]:
+        """Execute decided actions using available tools."""
+        results = []
+
+        for action in actions:
+            action_type = action.get("action")
+
+            try:
+                if action_type == "vote":
+                    result = self.governance_tools.vote_on_motion(
+                        motion_id=action.get("motion_id"),
+                        choice=action.get("choice")
+                    )
+                    results.append({"action": "vote", "result": result})
+
+                elif action_type == "produce":
+                    result = self.economic_tools.start_production(
+                        recipe_name=action.get("recipe"),
+                        batch_size=action.get("batch_size", 1)
+                    )
+                    results.append({"action": "produce", "result": result})
+
+                elif action_type == "buy":
+                    result = self.economic_tools.buy_from_market(
+                        resource_name=action.get("resource"),
+                        quantity=action.get("quantity"),
+                        max_price=action.get("max_price", 999999)
+                    )
+                    results.append({"action": "buy", "result": result})
+
+                elif action_type == "sell":
+                    result = self.economic_tools.sell_to_market(
+                        resource_name=action.get("resource"),
+                        quantity=action.get("quantity"),
+                        min_price=action.get("min_price", 0)
+                    )
+                    results.append({"action": "sell", "result": result})
+
+                elif action_type == "propose":
+                    result = self.governance_tools.propose_motion(
+                        title=action.get("title"),
+                        description=action.get("description"),
+                        motion_type=action.get("motion_type", "CUSTOM")
+                    )
+                    results.append({"action": "propose", "result": result})
+
+                else:
+                    # Unknown action type
+                    results.append({"action": action_type, "error": f"Unknown action type: {action_type}"})
+
+            except Exception as e:
+                results.append({"action": action_type, "error": str(e)})
+
+        return results

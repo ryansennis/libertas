@@ -246,6 +246,79 @@ class TestFederation(unittest.TestCase):
         self.assertIn("known_resources", summary)
         self.assertIn("known_recipes", summary)
 
+    def test_discard_pod_rebuilds_graph(self):
+        """Test discard() rebuilds graph with complete edges (lines 214-216)."""
+        worker_configs = [WorkerConfig(name=f"w{i}", reasoning=Mock, llm_model=LLM_MODEL) for i in range(3)]
+        pod_configs = [
+            PodConfig(name="pod_0", workers=worker_configs),
+            PodConfig(name="pod_1", workers=worker_configs),
+            PodConfig(name="pod_2", workers=worker_configs)
+        ]
+        fed = Federation(pods=pod_configs, seed=42)
+
+        # Remove one pod
+        pod_to_remove = fed[0]
+        fed.discard(pod_to_remove)
+
+        # Should have complete graph with remaining 2 pods
+        graph = fed.get_pod_network()
+        self.assertEqual(graph.number_of_nodes(), 2)
+        self.assertEqual(graph.number_of_edges(), 1)  # Complete graph with 2 nodes has 1 edge
+
+    def test_economic_summary_counts_tools(self):
+        """Test get_economic_summary counts tools from pods (line 292)."""
+        worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
+        pod_config = PodConfig(name="pod_0", workers=worker_configs, initial_inventory={"hammer": 3.0})
+        fed = Federation(pods=[pod_config], seed=42)
+
+        # Register hammer as tool
+        hammer = Resource("hammer", base_value=10.0, is_tool=True, durability=100)
+        fed.register_new_resource(hammer)
+
+        # Add tools to pod inventory
+        pod = fed[0]
+        pod.inventory.add(hammer, 3)
+
+        summary = fed.get_economic_summary()
+
+        # Should count tools
+        self.assertIn("total_tools", summary)
+        self.assertIn("hammer", summary["total_tools"])
+
+    def test_step_with_market_transactions(self):
+        """Test step() processes market transactions (lines 317-323)."""
+        from unittest.mock import patch
+
+        worker_configs = [
+            WorkerConfig(name="buyer", reasoning=Mock, llm_model=LLM_MODEL),
+            WorkerConfig(name="seller", reasoning=Mock, llm_model=LLM_MODEL)
+        ]
+        pod_config = PodConfig(name="pod_0", workers=worker_configs, initial_inventory={"wood": 100.0})
+        fed = Federation(pods=[pod_config], seed=42, initialize_market=True)
+
+        # Get workers by name
+        buyer = fed._find_worker_by_name("buyer")
+        seller = fed._find_worker_by_name("seller")
+
+        # Give buyer currency
+        buyer.add_currency(1000.0)
+        initial_buyer_currency = buyer.currency
+        initial_seller_currency = seller.currency
+
+        # Mock market to return transactions
+        mock_transactions = [{
+            'buyer_worker': "buyer",
+            'seller_worker': "seller",
+            'total_value': 100.0
+        }]
+
+        with patch.object(fed.market, 'process_market', return_value=mock_transactions):
+            fed.step()
+
+        # Currency should be transferred (lines 317-323)
+        self.assertEqual(buyer.currency, initial_buyer_currency - 100.0)
+        self.assertEqual(seller.currency, initial_seller_currency + 100.0)
+
 
 @pytest.mark.unit
 class TestFederationWithCustomRegistries(unittest.TestCase):
@@ -332,12 +405,182 @@ class TestFederationEdgeCases(unittest.TestCase):
     def test_remove_nonexistent_pod(self):
         """Test removing pod not in federation."""
         from libertas.organization.pod import PodConfig, Pod
-        
+
         fake_config = PodConfig(name="fake_pod", workers=[])
         fake_pod = Pod(self.empty_federation, fake_config, (0, 0))
-        
+
         with self.assertRaises(KeyError):
             self.single_pod_federation.remove(fake_pod)
+
+    def test_register_new_resource_no_registry(self):
+        """Test register_new_resource when resource_registry is None."""
+        # Manually set resource_registry to None after construction
+        fed = Federation(pods=[], seed=42)
+        fed.resource_registry = None
+
+        # Try to register resource - should return False
+        resource = Resource("test", base_value=10.0)
+        result = fed.register_new_resource(resource)
+        self.assertFalse(result)
+
+    def test_update_pod_coordinates_empty_federation(self):
+        """Test _update_pod_coordinates with empty federation."""
+        import networkx as nx
+        graph = nx.Graph()
+
+        # Should not raise error
+        self.empty_federation._update_pod_coordinates(graph)
+
+    def test_set_pod_layout_circular_with_single_pod(self):
+        """Test set_pod_layout with circular layout and single pod."""
+        # Set circular layout
+        self.single_pod_federation.set_pod_layout("circular")
+
+        # Should not raise error
+        self.assertEqual(len(self.single_pod_federation), 1)
+
+    def test_set_pod_layout_grid_with_no_pods(self):
+        """Test set_pod_layout with grid layout and no pods."""
+        # Should not raise error
+        self.empty_federation.set_pod_layout("grid")
+        self.assertEqual(len(self.empty_federation), 0)
+
+    def test_set_pod_layout_spring(self):
+        """Test set_pod_layout with spring layout."""
+        # Set spring layout
+        self.single_pod_federation.set_pod_layout("spring")
+
+        # Should not raise error
+        self.assertEqual(len(self.single_pod_federation), 1)
+
+    def test_set_pod_layout_random(self):
+        """Test set_pod_layout with random layout."""
+        # Set random layout
+        self.single_pod_federation.set_pod_layout("random")
+
+        # Should not raise error
+        self.assertEqual(len(self.single_pod_federation), 1)
+
+    def test_set_pod_layout_kamada_kawai(self):
+        """Test set_pod_layout with kamada_kawai layout."""
+        # Create federation with 2+ pods (kamada_kawai needs connected graph)
+        worker_configs = [WorkerConfig(name=f"w{i}", reasoning=Mock, llm_model=LLM_MODEL) for i in range(2)]
+        pod_configs = [
+            PodConfig(name="pod_0", workers=worker_configs),
+            PodConfig(name="pod_1", workers=worker_configs)
+        ]
+        fed = Federation(pods=pod_configs, seed=42)
+
+        # Set kamada_kawai layout
+        fed.set_pod_layout("kamada_kawai")
+
+        # Should not raise error
+        self.assertEqual(len(fed), 2)
+
+    def test_get_economic_summary_with_tools(self):
+        """Test get_economic_summary includes tool inventory."""
+        # Add tools to pod inventory
+        worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
+        pod_config = PodConfig(name="pod_0", workers=worker_configs, initial_inventory={"hammer": 3.0})
+        fed = Federation(pods=[pod_config], seed=42)
+
+        # Register hammer as a tool
+        hammer = Resource("hammer", base_value=10.0, is_tool=True, durability=100)
+        fed.register_new_resource(hammer)
+
+        summary = fed.get_economic_summary()
+
+        # Should include tools section
+        self.assertIn("total_tools", summary)
+
+    def test_set_pod_layout_invalid(self):
+        """Test set_pod_layout with invalid layout type."""
+        worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
+        pod_config = PodConfig(name="pod_0", workers=worker_configs)
+        fed = Federation(pods=[pod_config], seed=42)
+
+        # Should raise ValueError for unknown layout
+        with self.assertRaises(ValueError) as cm:
+            fed.set_pod_layout("invalid_layout")
+
+        self.assertIn("Unknown layout type", str(cm.exception))
+
+    def test_getitem_invalid_type(self):
+        """Test __getitem__ with invalid key type."""
+        worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
+        pod_config = PodConfig(name="pod_0", workers=worker_configs)
+        fed = Federation(pods=[pod_config], seed=42)
+
+        # Should raise TypeError for invalid key type
+        with self.assertRaises(TypeError) as cm:
+            _ = fed[1.5]  # float key
+
+        self.assertIn("Invalid key type", str(cm.exception))
+
+    def test_get_neighbors_no_graph(self):
+        """Test get_neighbors when _pod_graph is None."""
+        worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
+        pod_config = PodConfig(name="pod_0", workers=worker_configs)
+        fed = Federation(pods=[pod_config], seed=42)
+
+        # Manually set _pod_graph to None
+        fed._pod_graph = None
+
+        pod = list(fed)[0]
+        neighbors = fed.get_neighbors(pod)
+
+        # Should return empty list
+        self.assertEqual(neighbors, [])
+
+    def test_discard_with_graph_rebuild(self):
+        """Test discard removes pod and rebuilds graph."""
+        worker_configs = [WorkerConfig(name=f"w{i}", reasoning=Mock, llm_model=LLM_MODEL) for i in range(2)]
+        pod_configs = [
+            PodConfig(name="pod_0", workers=worker_configs),
+            PodConfig(name="pod_1", workers=worker_configs)
+        ]
+        fed = Federation(pods=pod_configs, seed=42)
+
+        # Get first pod
+        pod = list(fed)[0]
+
+        # Discard it
+        fed.discard(pod)
+
+        # Should have one pod left
+        self.assertEqual(len(fed), 1)
+        self.assertNotIn(pod, fed)
+
+    def test_discard_nonexistent_pod(self):
+        """Test discard with pod not in federation (should not raise)."""
+        from libertas.organization.pod import Pod
+
+        worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
+        pod_config = PodConfig(name="pod_0", workers=worker_configs)
+        fed = Federation(pods=[pod_config], seed=42)
+
+        # Create fake pod
+        fake_config = PodConfig(name="fake_pod", workers=[])
+        fake_pod = Pod(fed, fake_config, (0, 0))
+
+        # Discard should not raise error
+        fed.discard(fake_pod)
+        self.assertEqual(len(fed), 1)
+
+    def test_get_economic_summary_with_pod_tools(self):
+        """Test get_economic_summary includes tools from pods."""
+        worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
+        pod_config = PodConfig(name="pod_0", workers=worker_configs, initial_inventory={"wood": 50.0})
+        fed = Federation(pods=[pod_config], seed=42)
+
+        # Register tool
+        hammer = Resource("hammer", base_value=10.0, is_tool=True, durability=100)
+        fed.register_new_resource(hammer)
+
+        summary = fed.get_economic_summary()
+
+        # Should have total_tools key
+        self.assertIn("total_tools", summary)
 
 
 if __name__ == '__main__':

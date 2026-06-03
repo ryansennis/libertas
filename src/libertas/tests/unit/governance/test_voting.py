@@ -977,3 +977,28 @@ class TestGovernanceEngine:
 
         # Average = (1.0 + 0.5) / 2 = 0.75
         assert stats["average_participation_rate"] == 0.75
+
+    def test_tally_votes_unknown_vote_type(self):
+        """Test tallying with an unknown vote type (edge case)."""
+        motion = Motion(
+            motion_id="M_unknown",
+            motion_type=MotionType.CUSTOM,
+            title="Test",
+            description="Test",
+            proposer="worker_001",
+            scope="pod",
+            vote_type=None,  # Invalid - will trigger else clause
+            eligible_voters={"worker_001", "worker_002"}
+        )
+
+        motion.cast_vote("worker_001", "for")
+        motion.cast_vote("worker_002", "for")
+
+        # Manually set vote_type to an unexpected value
+        # This tests the else clause in tally_votes
+        motion.vote_type = "INVALID"
+
+        passed, results = motion.tally_votes()
+
+        # Should fail with unknown vote type
+        assert passed is False
