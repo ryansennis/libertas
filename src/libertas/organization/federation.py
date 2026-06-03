@@ -305,23 +305,38 @@ class Federation(mesa.Model, MutableSet[Pod]):
 
     def step(self) -> None:
         super().step()
-        
+
         if hasattr(self, 'market') and self.market:
             transactions = self.market.process_market(
                 timestamp=self.steps,
                 pod_inventory_getter=self._get_pod_inventory,
                 pod_inventory_setter=self._update_pod_inventory
             )
-            
+
             for tx in transactions:
                 buyer_worker = self._find_worker_by_name(tx['buyer_worker'])
                 seller_worker = self._find_worker_by_name(tx['seller_worker'])
-                
+
                 if buyer_worker and seller_worker:
                     cost = tx['total_value']
                     if buyer_worker.subtract_currency(cost):
                         seller_worker.add_currency(cost)
-        
+
+        # Autonomous agent cognitive loop
+        for pod in self._pods:
+            for worker in pod:
+                cognitive_result = worker.observe_and_reason()
+                actions = cognitive_result.get("actions", [])
+                if actions:
+                    worker.execute_actions(actions)
+
+        # Process governance votes
+        if hasattr(self, 'governance') and self.governance:
+            completed_motions = self.governance.process_votes(self.steps)
+            for motion, passed in completed_motions:
+                if passed:
+                    self._execute_motion(motion)
+
         for pod in self._pods:
             pod.step()
 
@@ -347,3 +362,9 @@ class Federation(mesa.Model, MutableSet[Pod]):
                 if worker.name == name:
                     return worker
         return None
+
+    def _execute_motion(self, motion):
+        """Execute a passed motion."""
+        # Placeholder for motion execution logic
+        # Will implement specific motion type handlers in future PRs
+        pass
