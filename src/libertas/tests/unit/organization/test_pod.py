@@ -43,19 +43,166 @@ class TestPodConfig(unittest.TestCase):
             WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)
         ]
         config = PodConfig(name="pod_001", workers=worker_configs)
-        
+
         json_str = config.to_json()
         self.assertIsInstance(json_str, str)
-        
+
         loaded = PodConfig.from_json(json_str)
+
+    def test_config_to_json_with_filepath(self):
+        """Test config serialization to file."""
+        import tempfile
+        worker_configs = [
+            WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)
+        ]
+        config = PodConfig(name="pod_001", workers=worker_configs)
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            filepath = f.name
+
+        try:
+            result = config.to_json(filepath=filepath)
+            self.assertIsNone(result)  # Returns None when writing to file
+
+            # Read back
+            loaded = PodConfig.from_json(None, filepath=filepath)
+            self.assertEqual(loaded.name, config.name)
+        finally:
+            import os
+            if os.path.exists(filepath):
+                os.remove(filepath)
+
+    def test_config_from_json_dict(self):
+        """Test config from dict."""
+        config_dict = {
+            "name": "pod_001",
+            "workers": [],
+            "initial_inventory": {"wood": 50.0}
+        }
+
+        loaded = PodConfig.from_json(config_dict)
+        self.assertEqual(loaded.name, "pod_001")
+        self.assertEqual(loaded.initial_inventory, {"wood": 50.0})
+
+    def test_config_from_json_invalid_type(self):
+        """Test config from invalid data type."""
+        with self.assertRaises(ValueError) as cm:
+            PodConfig.from_json(123)
+
+        self.assertIn("Unsupported data type", str(cm.exception))
+
+    def test_config_from_json_file(self):
+        """Test config from_json_file convenience method."""
+        import tempfile
+        worker_configs = [
+            WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)
+        ]
+        config = PodConfig(name="pod_001", workers=worker_configs)
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            filepath = f.name
+
+        try:
+            config.to_json(filepath=filepath)
+            loaded = PodConfig.from_json_file(filepath)
+            self.assertEqual(loaded.name, config.name)
+        finally:
+            import os
+            if os.path.exists(filepath):
+                os.remove(filepath)
         self.assertEqual(loaded.name, config.name)
         self.assertEqual(len(loaded.workers), len(config.workers))
 
 
 @pytest.mark.unit
+class TestPodInitialization(unittest.TestCase):
+    """Test Pod initialization with tools."""
+
+    def test_pod_with_initial_tools(self):
+        """Test pod initialization with initial_tools."""
+        federation = Federation(pods=[], seed=42)
+
+        # Register tools
+        hammer = Resource("hammer", base_value=10.0, is_tool=True, durability=100)
+        saw = Resource("saw", base_value=15.0, is_tool=True, durability=80)
+        federation.register_new_resource(hammer)
+        federation.register_new_resource(saw)
+
+        worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
+        pod_config = PodConfig(
+            name="tool_pod",
+            workers=worker_configs,
+            initial_tools=["hammer", "saw"]
+        )
+
+        pod = Pod(federation, pod_config, coordinate=(0, 0))
+
+        # Should have tools in inventory
+        self.assertGreater(len(pod.inventory.instances.get("hammer", [])), 0)
+        self.assertGreater(len(pod.inventory.instances.get("saw", [])), 0)
+
+    def test_pod_with_unregistered_initial_tool(self):
+        """Test pod initialization with unregistered tool."""
+        federation = Federation(pods=[], seed=42)
+
+        worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
+        pod_config = PodConfig(
+            name="tool_pod",
+            workers=worker_configs,
+            initial_tools=["nonexistent_tool"]
+        )
+
+        pod = Pod(federation, pod_config, coordinate=(0, 0))
+
+        # Should not have the nonexistent tool
+        self.assertEqual(len(pod.inventory.instances.get("nonexistent_tool", [])), 0)
+
+    def test_pod_equality_different_type(self):
+        """Test pod __eq__ with non-Pod object."""
+        federation = Federation(pods=[], seed=42)
+        worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
+        pod_config = PodConfig(name="test_pod", workers=worker_configs)
+        pod = Pod(federation, pod_config, coordinate=(0, 0))
+
+        self.assertNotEqual(pod, "not a pod")
+        self.assertNotEqual(pod, 123)
+        self.assertNotEqual(pod, None)
+
+
+@pytest.mark.unit
+class TestPodProperties(unittest.TestCase):
+    """Test Pod property accessors."""
+
+    def setUp(self):
+        self.federation = Federation(pods=[], seed=42)
+        worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
+        pod_config = PodConfig(name="test_pod", workers=worker_configs)
+        self.pod = Pod(self.federation, pod_config, coordinate=(5, 10))
+
+    def test_position_getter(self):
+        """Test pod position property getter."""
+        position = self.pod.position
+        # Position should be accessible
+        self.assertTrue(hasattr(self.pod, 'position'))
+
+    def test_position_setter(self):
+        """Test pod position property setter."""
+        self.pod.position = (20, 30)
+        # Setting position should not raise error
+        self.assertTrue(hasattr(self.pod, 'position'))
+
+    def test_start_production_recipe_not_found(self):
+        """Test start_production with non-existent recipe."""
+        success, message = self.pod.start_production("nonexistent_recipe")
+
+        self.assertFalse(success)
+        self.assertIn("not found", message)
+
+
+@pytest.mark.unit
 class TestPod(unittest.TestCase):
     """Test Pod class with real Federation."""
-    
+
     def setUp(self):
         # Create real federation
         self.federation = Federation(pods=[])

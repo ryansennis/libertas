@@ -338,6 +338,21 @@ class TestResourceEdgeCases(unittest.TestCase):
 
         self.assertFalse(resource.use_tool())
 
+    def test_invention_history_property(self):
+        """Test getting invention history from registry (line 171)."""
+        registry = ResourceRegistry()
+
+        # Invent some resources
+        registry.invent("diamond", "worker1", 10, base_value=100.0)
+        registry.invent("ruby", "worker2", 20, base_value=80.0)
+
+        # Get history via property
+        history = registry.invention_history
+
+        self.assertEqual(len(history), 2)
+        self.assertEqual(history[0]["name"], "diamond")
+        self.assertEqual(history[1]["name"], "ruby")
+
 
 if __name__ == '__main__':
     unittest.main()

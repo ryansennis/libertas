@@ -583,6 +583,25 @@ class TestGovernanceToolsEdgeCases(unittest.TestCase):
         assert result_dict["count"] == 1
         assert result_dict["active_motions"][0]["scope"] == "federation"
 
+    def test_propose_motion_permission_denied(self):
+        """Test PermissionError handling in propose_motion (lines 197-198)."""
+        from unittest.mock import patch
+
+        # Mock governance.propose_motion to raise PermissionError
+        with patch.object(self.federation.governance, 'propose_motion') as mock_propose:
+            mock_propose.side_effect = PermissionError("Test permission denied")
+
+            result = self.alice.governance_tools.propose_motion(
+                "Should Fail",
+                "Test error handling",
+                scope="pod"
+            )
+            result_dict = json.loads(result)
+
+            assert result_dict["success"] is False
+            assert "error" in result_dict
+            assert "permission denied" in result_dict["error"].lower()
+
 
 if __name__ == "__main__":
     unittest.main()

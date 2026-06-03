@@ -259,14 +259,173 @@ class TestProductionJob(unittest.TestCase):
             batch_size=2
         )
         job.completed_steps = [0]
-        
+
         data = job.to_dict()
         restored = ProductionJob.from_dict(data)
-        
+
         self.assertEqual(restored.recipe.name, job.recipe.name)
         self.assertEqual(restored.started_by, job.started_by)
         self.assertEqual(restored.batch_size, job.batch_size)
         self.assertEqual(restored.completed_steps, job.completed_steps)
+
+    def test_get_step_remaining_duration_no_current_step(self):
+        """Test get_step_remaining_duration when no current step exists."""
+        # Create job with no steps
+        empty_recipe = Recipe(name="empty", steps=[])
+        job = ProductionJob(recipe=empty_recipe)
+
+        # Should return 0 when no current step
+        self.assertEqual(job.get_step_remaining_duration(10), 0)
+
+    def test_consume_step_inputs_no_current_step(self):
+        """Test consume_step_inputs when no current step exists."""
+        # Create job with no steps
+        empty_recipe = Recipe(name="empty", steps=[])
+        job = ProductionJob(recipe=empty_recipe)
+
+        # Should return False when no current step
+        self.assertFalse(job.consume_step_inputs())
+
+    def test_consume_step_inputs_with_batch_size(self):
+        """Test consume_step_inputs multiplies by batch_size."""
+        steps = [
+            ProductionStep(
+                name="step1",
+                step_type=StepType.PROCESSING,
+                duration=5,
+                inputs={"wood": 2},
+                outputs={"planks": 1}
+            )
+        ]
+        recipe = Recipe(name="test", steps=steps)
+        job = ProductionJob(recipe=recipe, batch_size=3)
+
+        # Consume inputs for current step
+        job.consume_step_inputs()
+
+        # Should be 2 wood * 3 batch_size = 6
+        self.assertEqual(job.inputs_consumed["wood"], 6)
+
+    def test_get_step_outputs_no_current_step(self):
+        """Test get_step_outputs when no current step exists."""
+        # Create job with no steps
+        empty_recipe = Recipe(name="empty", steps=[])
+        job = ProductionJob(recipe=empty_recipe)
+
+        # Should return empty dict when no current step
+        self.assertEqual(job.get_step_outputs(), {})
+
+    def test_get_progress_empty_recipe(self):
+        """Test get_progress with empty recipe."""
+        empty_recipe = Recipe(name="empty", steps=[])
+        job = ProductionJob(recipe=empty_recipe)
+
+        # Should return 1.0 for empty recipe
+        self.assertEqual(job.get_progress(), 1.0)
+
+    def test_start_current_step(self):
+        """Test start_current_step sets step_start_step."""
+        job = ProductionJob(recipe=self.recipe)
+
+        # Initially should be None
+        self.assertIsNone(job.step_start_step)
+
+        # Start the step at simulation step 100
+        job.start_current_step(100)
+
+        # Should now be set
+        self.assertEqual(job.step_start_step, 100)
+
+    def test_get_step_remaining_duration_before_started(self):
+        """Test get_step_remaining_duration before step is started."""
+        job = ProductionJob(recipe=self.recipe)
+
+        # step_start_step is None, should return full duration
+        self.assertEqual(job.get_step_remaining_duration(10), 5)
+
+    def test_get_step_remaining_duration_in_progress(self):
+        """Test get_step_remaining_duration while step is in progress."""
+        job = ProductionJob(recipe=self.recipe)
+        job.start_current_step(100)
+
+        # At step 102, elapsed is 2, remaining should be 5 - 2 = 3
+        self.assertEqual(job.get_step_remaining_duration(102), 3)
+
+        # At step 105, elapsed is 5, remaining should be 0
+        self.assertEqual(job.get_step_remaining_duration(105), 0)
+
+    def test_get_total_outputs(self):
+        """Test get_total_outputs returns copy of outputs_produced."""
+        steps = [
+            ProductionStep(
+                name="step1",
+                step_type=StepType.PROCESSING,
+                duration=5,
+                outputs={"product": 2}
+            )
+        ]
+        recipe = Recipe(name="test", steps=steps)
+        job = ProductionJob(recipe=recipe, batch_size=3)
+
+        # Complete the step
+        job.complete_step(10)
+
+        # Should have 2 * 3 = 6 products
+        outputs = job.get_total_outputs()
+        self.assertEqual(outputs["product"], 6)
+
+        # Modifying returned dict shouldn't affect job
+        outputs["product"] = 999
+        self.assertEqual(job.outputs_produced["product"], 6)
+
+    def test_get_next_step(self):
+        """Test get_next_step returns current uncompleted step."""
+        job = ProductionJob(recipe=self.recipe)
+
+        # Initially should be first step
+        next_step = job.get_next_step()
+        self.assertIsNotNone(next_step)
+        if next_step:
+            self.assertEqual(next_step.name, "step1")
+
+        # Complete first step
+        job.complete_step(10)
+
+        # Should now be second step
+        next_step = job.get_next_step()
+        self.assertIsNotNone(next_step)
+        if next_step:
+            self.assertEqual(next_step.name, "step2")
+
+        # Complete second step
+        job.complete_step(20)
+
+        # No more steps
+        self.assertIsNone(job.get_next_step())
+
+
+@pytest.mark.unit
+class TestStartingRecipes(unittest.TestCase):
+    """Test get_starting_recipes function."""
+
+    def test_get_starting_recipes(self):
+        """Test that get_starting_recipes returns valid recipes."""
+        from libertas.economy.production import get_starting_recipes
+
+        recipes = get_starting_recipes()
+
+        # Should return a list
+        self.assertIsInstance(recipes, list)
+
+        # Should have some recipes
+        self.assertGreater(len(recipes), 0)
+
+        # All items should be Recipe instances
+        from libertas.economy import Recipe
+        for recipe in recipes:
+            self.assertIsInstance(recipe, Recipe)
+            self.assertIsNotNone(recipe.name)
+            self.assertGreater(len(recipe.steps), 0)
 
 
 @pytest.mark.unit
@@ -324,17 +483,73 @@ class TestRecipeRegistry(unittest.TestCase):
 @pytest.mark.unit
 class TestRecipeEdgeCases(unittest.TestCase):
     """Test edge cases for recipe system."""
-    
+
     def test_empty_recipe(self):
         """Test recipe with no steps."""
         recipe = Recipe(name="empty", steps=[])
-        
+
         self.assertEqual(recipe.total_duration, 0)
         self.assertEqual(recipe.total_inputs, {})
         self.assertEqual(recipe.total_outputs, {})
-        
+
         can_start, _ = recipe.can_start({})
         self.assertTrue(can_start)
+
+    def test_get_step_inputs_invalid_index(self):
+        """Test get_step_inputs with invalid step index."""
+        recipe = Recipe(
+            name="test_recipe",
+            steps=[
+                ProductionStep(
+                    name="step1",
+                    step_type=StepType.PROCESSING,
+                    duration=5,
+                    inputs={"wood": 2},
+                    outputs={"planks": 1}
+                )
+            ]
+        )
+
+        # Invalid index should return empty dict
+        self.assertEqual(recipe.get_step_inputs(-1), {})
+        self.assertEqual(recipe.get_step_inputs(999), {})
+
+    def test_get_step_outputs_invalid_index(self):
+        """Test get_step_outputs with invalid step index."""
+        recipe = Recipe(
+            name="test_recipe",
+            steps=[
+                ProductionStep(
+                    name="step1",
+                    step_type=StepType.PROCESSING,
+                    duration=5,
+                    inputs={"wood": 2},
+                    outputs={"planks": 1}
+                )
+            ]
+        )
+
+        # Invalid index should return empty dict
+        self.assertEqual(recipe.get_step_outputs(-1), {})
+        self.assertEqual(recipe.get_step_outputs(999), {})
+
+    def test_get_required_tools_for_step_invalid_index(self):
+        """Test get_required_tools_for_step with invalid step index."""
+        recipe = Recipe(
+            name="test_recipe",
+            steps=[
+                ProductionStep(
+                    name="step1",
+                    step_type=StepType.PROCESSING,
+                    duration=5,
+                    required_tool="hammer"
+                )
+            ]
+        )
+
+        # Invalid index should return None
+        self.assertIsNone(recipe.get_required_tools_for_step(-1))
+        self.assertIsNone(recipe.get_required_tools_for_step(999))
     
     def test_job_with_zero_batch(self):
         """Test job with zero batch size."""
