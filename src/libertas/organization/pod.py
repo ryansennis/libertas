@@ -1,5 +1,6 @@
 from __future__ import annotations
 from ..economy import Inventory, ProductionJob
+from ..governance import Constitution
 from .worker import Worker, WorkerConfig
 from dataclasses import dataclass
 from mesa.agentset import AgentSet
@@ -19,6 +20,7 @@ class PodConfig:
     random: Optional[Random] = None
     initial_inventory: Optional[Dict[str, float]] = None
     initial_tools: Optional[List[str]] = None
+    constitution: Optional[Constitution] = None
     
     def to_json(self, filepath: Optional[str] = None) -> Union[str, None]:
         """Convert PodConfig to JSON string or save to file."""
@@ -79,11 +81,14 @@ class PodConfig:
 
 class Pod(AgentSet[Worker]):
     """Pod that manages a group of workers with spatial positioning and production."""
-    
+
     def __init__(self, federation, pod_config, coordinate):
         self.name = pod_config.name
         self.federation = federation
         self.pod_config = pod_config
+
+        # Initialize governance
+        self.constitution = pod_config.constitution or Constitution.create_default_pod_constitution(pod_config.name)
 
         worker_instances: List[Worker] = []
         for idx, config in enumerate(pod_config.workers):

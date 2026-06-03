@@ -2,7 +2,7 @@
 """Shared pytest fixtures for libertas tests."""
 
 import pytest
-from unittest.mock import Mock
+from mesa_llm.reasoning.cot import CoTReasoning
 
 from libertas.economy import Resource, Recipe, ProductionStep, StepType, ResourceRegistry, RecipeRegistry
 from libertas.organization import WorkerConfig, PodConfig, Federation
@@ -78,7 +78,7 @@ def basic_worker_config():
     """Create a basic worker configuration for testing."""
     return WorkerConfig(
         name="worker_001",
-        reasoning=Mock,
+        reasoning=CoTReasoning,
         llm_model="ollama/tinyllama",
         initial_currency=500.0,
         initial_skills={"crafting": 2.0, "smelting": 1.5},
@@ -121,7 +121,7 @@ def multi_pod_federation(resource_registry, recipe_registry):
     """Create a federation with multiple pods for integration testing."""
     worker1_config = WorkerConfig(
         name="worker_001",
-        reasoning=Mock,
+        reasoning=CoTReasoning,
         llm_model="ollama/tinyllama",
         initial_currency=500.0,
         initial_skills={"crafting": 2.0}
@@ -129,7 +129,7 @@ def multi_pod_federation(resource_registry, recipe_registry):
 
     worker2_config = WorkerConfig(
         name="worker_002",
-        reasoning=Mock,
+        reasoning=CoTReasoning,
         llm_model="ollama/tinyllama",
         initial_currency=500.0,
         initial_skills={"smelting": 3.0}

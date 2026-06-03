@@ -2,7 +2,7 @@
 """Integration tests for Worker-Pod interactions."""
 
 import pytest
-from unittest.mock import Mock
+from mesa_llm.reasoning.cot import CoTReasoning
 
 from libertas.economy import Resource, ResourceRegistry, Recipe, RecipeRegistry, ProductionStep, StepType
 from libertas.organization import WorkerConfig, PodConfig, Federation
@@ -47,7 +47,7 @@ class TestWorkerPodIntegration:
         # Create worker and pod
         worker_config = WorkerConfig(
             name="worker_001",
-            reasoning=Mock,
+            reasoning=CoTReasoning,
             llm_model="ollama/tinyllama",
             initial_currency=500.0,
             initial_skills={"crafting": 3.0},
@@ -201,13 +201,13 @@ class TestWorkerPodIntegration:
         # Create multiple workers
         worker1_config = WorkerConfig(
             name="worker_001",
-            reasoning=Mock,
+            reasoning=CoTReasoning,
             llm_model="ollama/tinyllama",
             initial_skills={"crafting": 2.0}
         )
         worker2_config = WorkerConfig(
             name="worker_002",
-            reasoning=Mock,
+            reasoning=CoTReasoning,
             llm_model="ollama/tinyllama",
             initial_skills={"smelting": 3.0}
         )

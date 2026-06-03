@@ -2,7 +2,7 @@
 """End-to-end simulation tests."""
 
 import pytest
-from unittest.mock import Mock
+from mesa_llm.reasoning.cot import CoTReasoning
 
 from libertas.economy import Resource, ResourceRegistry, Recipe, RecipeRegistry, ProductionStep, StepType
 from libertas.organization import WorkerConfig, PodConfig, Federation
@@ -68,7 +68,7 @@ class TestSimpleSimulation:
         # Setup worker and pod
         worker_config = WorkerConfig(
             name="worker_001",
-            reasoning=Mock,
+            reasoning=CoTReasoning,
             llm_model="ollama/tinyllama",
             initial_currency=100.0,
             initial_skills={"crafting": 3.0}
@@ -153,7 +153,7 @@ class TestSimpleSimulation:
 
         worker_config = WorkerConfig(
             name="apprentice",
-            reasoning=Mock,
+            reasoning=CoTReasoning,
             llm_model="ollama/tinyllama",
             initial_skills={"crafting": 1.0}  # Start low
         )
@@ -200,7 +200,7 @@ class TestSimpleSimulation:
         # Setup basic federation
         worker_config = WorkerConfig(
             name="worker_001",
-            reasoning=Mock,
+            reasoning=CoTReasoning,
             llm_model="ollama/tinyllama"
         )
         pod_config = PodConfig(
@@ -233,7 +233,7 @@ class TestSimpleSimulation:
         # Minimal setup
         worker_config = WorkerConfig(
             name="worker_001",
-            reasoning=Mock,
+            reasoning=CoTReasoning,
             llm_model="ollama/tinyllama"
         )
         pod_config = PodConfig(
