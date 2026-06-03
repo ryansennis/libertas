@@ -20,6 +20,53 @@ Libertas enables large-scale experiments to identify optimal organizational stru
 - **Autonomous Agents**: LLM-powered workers with personalities, backgrounds, and decision-making
 - **Research-Oriented**: Designed for running batch experiments to derive statistical insights
 
+## System Requirements
+
+### Recommended Hardware
+
+Libertas is designed for **large-scale agent-based simulations** with LLM-powered autonomous agents. To get the most out of the framework:
+
+**Minimum** (for development/testing):
+- CPU: 4+ cores
+- RAM: 8GB
+- Storage: 10GB (for model weights)
+- Python 3.12+
+
+**Recommended** (for serious research):
+- CPU: 16+ cores (for parallel agent processing)
+- RAM: 32GB+ (large simulations with many agents)
+- GPU: NVIDIA GPU with 8GB+ VRAM (for local LLM inference)
+- Storage: 50GB+ SSD (model weights, experiment data)
+- OS: Linux or macOS (better for long-running simulations)
+
+**For Large-Scale Experiments** (100+ agents, batch experiments):
+- CPU: 32+ cores / Threadripper / Server CPU
+- RAM: 64GB-128GB
+- GPU: NVIDIA A100, H100, or multiple consumer GPUs
+- Storage: NVMe SSD with 500GB+
+- Consider: Cloud compute (AWS, GCP, Azure) with spot instances
+
+### LLM Backend Options
+
+1. **Local (Ollama)** - Best for serious research
+   - Full control over models and inference
+   - No API costs
+   - Requires powerful GPU (RTX 3090, 4090, or better)
+   - Install: `curl -fsSL https://ollama.com/install.sh | sh`
+
+2. **Cloud APIs** (OpenAI, Anthropic, etc.)
+   - No hardware requirements
+   - Pay per token (can get expensive with many agents)
+   - Potential rate limits
+   - Good for prototyping
+
+3. **Remote Ollama Server**
+   - Run Ollama on a powerful server
+   - Access from lightweight machines
+   - Good middle ground
+
+**Note**: Integration and E2E tests run actual LLM inference, so they can take several minutes even on powerful hardware.
+
 ## Quick Start
 
 ### Installation
@@ -235,6 +282,36 @@ libertas/
     ├── integration/         # Interaction tests
     └── e2e/                 # Full simulation tests
 ```
+
+## Performance Tips
+
+### Optimizing for Large Simulations
+
+1. **Use Local LLMs**: Ollama with a good GPU is 10-100x faster than cloud APIs
+2. **Batch Experiments**: Run multiple simulations in parallel on multi-core systems
+3. **Profile First**: Use small simulations to tune before scaling up
+4. **Model Selection**: Smaller models (7B-13B) can be sufficient for many experiments
+5. **Checkpoint Often**: Save simulation state periodically for long-running experiments
+6. **Monitor Resources**: Watch CPU, RAM, and GPU usage to find bottlenecks
+
+### Expected Performance
+
+With a high-end consumer setup (RTX 4090, 32GB RAM, 16-core CPU):
+- **Unit tests**: ~4 seconds
+- **Integration tests**: ~30 seconds (with LLM calls)
+- **Small simulation** (5 agents, 100 steps): ~5-10 minutes
+- **Medium simulation** (20 agents, 1000 steps): ~1-2 hours
+- **Large simulation** (100 agents, 1000 steps): Several hours to days
+- **Batch experiments** (10 runs × medium): Can parallelize across cores
+
+### Scaling Strategies
+
+For research requiring massive scale:
+1. **Cloud Computing**: Use AWS/GCP with GPU instances (p3, g5, a2 instances)
+2. **Cluster Computing**: Distribute across multiple machines
+3. **Model Caching**: Cache LLM responses for repeated queries
+4. **Reduced Reasoning**: Limit LLM calls to critical decision points
+5. **Hierarchical Simulation**: Use simpler agents for routine tasks
 
 ## Development
 
