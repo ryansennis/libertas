@@ -246,6 +246,79 @@ class TestFederation(unittest.TestCase):
         self.assertIn("known_resources", summary)
         self.assertIn("known_recipes", summary)
 
+    def test_discard_pod_rebuilds_graph(self):
+        """Test discard() rebuilds graph with complete edges (lines 214-216)."""
+        worker_configs = [WorkerConfig(name=f"w{i}", reasoning=Mock, llm_model=LLM_MODEL) for i in range(3)]
+        pod_configs = [
+            PodConfig(name="pod_0", workers=worker_configs),
+            PodConfig(name="pod_1", workers=worker_configs),
+            PodConfig(name="pod_2", workers=worker_configs)
+        ]
+        fed = Federation(pods=pod_configs, seed=42)
+
+        # Remove one pod
+        pod_to_remove = fed[0]
+        fed.discard(pod_to_remove)
+
+        # Should have complete graph with remaining 2 pods
+        graph = fed.get_pod_network()
+        self.assertEqual(graph.number_of_nodes(), 2)
+        self.assertEqual(graph.number_of_edges(), 1)  # Complete graph with 2 nodes has 1 edge
+
+    def test_economic_summary_counts_tools(self):
+        """Test get_economic_summary counts tools from pods (line 292)."""
+        worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
+        pod_config = PodConfig(name="pod_0", workers=worker_configs, initial_inventory={"hammer": 3.0})
+        fed = Federation(pods=[pod_config], seed=42)
+
+        # Register hammer as tool
+        hammer = Resource("hammer", base_value=10.0, is_tool=True, durability=100)
+        fed.register_new_resource(hammer)
+
+        # Add tools to pod inventory
+        pod = fed[0]
+        pod.inventory.add(hammer, 3)
+
+        summary = fed.get_economic_summary()
+
+        # Should count tools
+        self.assertIn("total_tools", summary)
+        self.assertIn("hammer", summary["total_tools"])
+
+    def test_step_with_market_transactions(self):
+        """Test step() processes market transactions (lines 317-323)."""
+        from unittest.mock import patch
+
+        worker_configs = [
+            WorkerConfig(name="buyer", reasoning=Mock, llm_model=LLM_MODEL),
+            WorkerConfig(name="seller", reasoning=Mock, llm_model=LLM_MODEL)
+        ]
+        pod_config = PodConfig(name="pod_0", workers=worker_configs, initial_inventory={"wood": 100.0})
+        fed = Federation(pods=[pod_config], seed=42, initialize_market=True)
+
+        # Get workers by name
+        buyer = fed._find_worker_by_name("buyer")
+        seller = fed._find_worker_by_name("seller")
+
+        # Give buyer currency
+        buyer.add_currency(1000.0)
+        initial_buyer_currency = buyer.currency
+        initial_seller_currency = seller.currency
+
+        # Mock market to return transactions
+        mock_transactions = [{
+            'buyer_worker': "buyer",
+            'seller_worker': "seller",
+            'total_value': 100.0
+        }]
+
+        with patch.object(fed.market, 'process_market', return_value=mock_transactions):
+            fed.step()
+
+        # Currency should be transferred (lines 317-323)
+        self.assertEqual(buyer.currency, initial_buyer_currency - 100.0)
+        self.assertEqual(seller.currency, initial_seller_currency + 100.0)
+
 
 @pytest.mark.unit
 class TestFederationWithCustomRegistries(unittest.TestCase):

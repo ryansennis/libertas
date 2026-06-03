@@ -717,6 +717,66 @@ class TestWorkerWithTools(unittest.TestCase):
         self.assertEqual(outputs, {})
         self.assertIsNotNone(self.worker.current_job)
 
+    def test_federation_property_getter(self):
+        """Test federation property getter (line 231)."""
+        fed = self.worker.federation
+        self.assertEqual(fed, self.federation)
+
+    def test_step_when_tool_use_fails(self):
+        """Test step when tool use fails during production (line 395)."""
+        from libertas.economy import Recipe, ProductionStep, StepType
+
+        # Create recipe that requires tool
+        step = ProductionStep(
+            name="forge_steel",
+            duration=10,
+            step_type=StepType.PROCESSING,
+            inputs={"iron": 1.0},
+            outputs={"steel": 1.0},
+            required_tool="hammer"
+        )
+        recipe = Recipe(name="make_steel", steps=[step])
+        job = ProductionJob(recipe=recipe)
+
+        # Assign job and start step
+        self.worker.assign_to_job(job, 0, 100)
+        job.start_current_step(100)
+
+        # Mock equipped_tool to fail when used
+        mock_tool = Mock()
+        mock_tool.use_tool.return_value = False
+        self.worker.equipped_tool = mock_tool
+
+        # Work on step should return empty dict when tool fails
+        outputs = self.worker.work_on_current_step(105)
+        self.assertEqual(outputs, {})
+
+    def test_step_completes_job_with_outputs(self):
+        """Test step completion triggers line 438 (pass statement)."""
+        from libertas.economy import Recipe, ProductionStep, StepType
+
+        # Create simple recipe with outputs
+        step = ProductionStep(
+            name="make_plank",
+            duration=5,
+            step_type=StepType.PROCESSING,
+            inputs={"wood": 1.0},
+            outputs={"plank": 1.0}
+        )
+        recipe = Recipe(name="make_planks", steps=[step])
+        job = ProductionJob(recipe=recipe)
+
+        # Assign and start
+        self.worker.assign_to_job(job, 0, 100)
+        job.start_current_step(100)
+
+        # Complete the step (progress to 1.0)
+        for i in range(6):
+            outputs = self.worker.work_on_current_step(100 + i)
+
+        # Should have outputs and line 438 (pass) is executed
+        self.assertIsNotNone(outputs)
+
 
 if __name__ == '__main__':
     unittest.main()

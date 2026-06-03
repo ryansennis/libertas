@@ -374,6 +374,46 @@ class TestPod(unittest.TestCase):
         if json_str is not None:
             self.assertIn("pod_001", json_str)
 
+    def test_start_production_inventory_remove_fails(self):
+        """Test start_production when inventory.remove fails (line 181)."""
+        from unittest.mock import patch
+        from libertas.economy import Recipe, ProductionStep, StepType
+
+        # Register recipe
+        step = ProductionStep(
+            name="make_planks",
+            duration=10,
+            step_type=StepType.PROCESSING,
+            inputs={"wood": 10.0},
+            outputs={"plank": 5.0}
+        )
+        recipe = Recipe(name="make_planks", steps=[step])
+        self.federation.recipe_registry.register(recipe)
+
+        # Mock inventory.remove to return False
+        with patch.object(self.pod.inventory, 'remove', return_value=False):
+            success, message = self.pod.start_production("make_planks", batch_size=1)
+            self.assertFalse(success)
+            self.assertIn("Failed to consume", message)
+
+    def test_update_worker_coordinates_exception(self):
+        """Test exception handling in _update_worker_coordinates (lines 322-330, 350-351)."""
+        from unittest.mock import patch
+        import networkx as nx
+
+        # Create worker graph
+        graph = nx.Graph()
+        graph.add_node(list(self.pod)[0].unique_id)
+
+        # Mock networkx layout to raise exception
+        with patch('networkx.spring_layout', side_effect=Exception("Layout failed")):
+            # Should fall back to circular layout without crashing
+            self.pod._update_worker_coordinates(graph)
+
+            # Worker should have coordinates (from fallback)
+            worker = list(self.pod)[0]
+            self.assertIsNotNone(worker.coordinate)
+
 
 @pytest.mark.unit
 class TestPodProductionFailures(unittest.TestCase):
@@ -578,7 +618,7 @@ class TestPodEdgeCases(unittest.TestCase):
         config2 = PodConfig(name="pod2", workers=[])
         pod1 = Pod(self.federation, config1, coordinate=(0, 0))
         pod2 = Pod(self.federation, config2, coordinate=(1, 0))
-        
+
         success = pod1.transfer_to_pod("nonexistent", 10.0, pod2)
         self.assertFalse(success)
 
