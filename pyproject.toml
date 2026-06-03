@@ -82,6 +82,7 @@ source = ["src/libertas"]
 omit = [
     "*/tests/*",
     "*/test_*.py",
+    "*/conftest.py",
     "*/__pycache__/*",
 ]
 
