@@ -4,6 +4,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   quick-test:
     name: Quick Test & Lint
@@ -147,7 +152,7 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        python scripts/test.py --quick --coverage
+        python scripts/test.py --unit --coverage
 
     - name: Check if new code is tested
       run: |
