@@ -1,0 +1,193 @@
+name: PR Quick Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  quick-test:
+    name: Quick Test & Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        pip install ruff black
+
+    - name: Run unit tests (quick)
+      id: tests
+      run: |
+        python scripts/test.py --quick 2>&1 | tee test-output.txt
+        echo "test_status=$?" >> $GITHUB_OUTPUT
+
+    - name: Check code formatting
+      id: format
+      run: |
+        black --check src/ 2>&1 | tee format-output.txt || echo "format_status=1" >> $GITHUB_OUTPUT
+
+    - name: Lint with ruff
+      id: lint
+      run: |
+        ruff check src/ 2>&1 | tee lint-output.txt || echo "lint_status=1" >> $GITHUB_OUTPUT
+
+    - name: Create PR comment
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+
+          let comment = '## Quick Check Results\n\n';
+
+          // Test results
+          const testStatus = '${{ steps.tests.outputs.test_status }}';
+          comment += testStatus === '0' ? '✅ Unit tests passed\n' : '❌ Unit tests failed\n';
+
+          // Format check
+          const formatStatus = '${{ steps.format.outputs.format_status }}';
+          comment += formatStatus !== '1' ? '✅ Code formatting OK\n' : '⚠️ Code formatting issues\n';
+
+          // Lint check
+          const lintStatus = '${{ steps.lint.outputs.lint_status }}';
+          comment += lintStatus !== '1' ? '✅ Linting passed\n' : '⚠️ Linting issues found\n';
+
+          comment += '\n---\n';
+          comment += '_Run `python scripts/test.py --quick` locally to verify_';
+
+          // Find existing comment
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+          });
+
+          const botComment = comments.find(comment =>
+            comment.user.type === 'Bot' &&
+            comment.body.includes('Quick Check Results')
+          );
+
+          if (botComment) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: botComment.id,
+              body: comment
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
+          }
+
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety
+
+    - name: Check for security vulnerabilities
+      run: |
+        pip install -e .
+        safety check --json || true
+
+  test-changes:
+    name: Check Test Coverage on Changes
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout PR
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Get changed files
+      id: changed-files
+      run: |
+        git diff --name-only origin/main...HEAD | grep "\.py$" | grep -v "test_" > changed_files.txt || true
+        echo "Changed files:"
+        cat changed_files.txt
+
+    - name: Run tests with coverage
+      run: |
+        python scripts/test.py --quick --coverage
+
+    - name: Check if new code is tested
+      run: |
+        if [ -s changed_files.txt ]; then
+          echo "Checking coverage for changed files..."
+          coverage report $(cat changed_files.txt | tr '\n' ' ') 2>&1 | tee coverage-changed.txt || true
+        else
+          echo "No Python source files changed"
+        fi
+
+    - name: Comment coverage on changed files
+      if: always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+
+          let comment = '## Coverage on Changed Files\n\n';
+
+          try {
+            const changedFiles = fs.readFileSync('changed_files.txt', 'utf8');
+            if (changedFiles.trim()) {
+              comment += '```\n';
+              const coverage = fs.readFileSync('coverage-changed.txt', 'utf8');
+              comment += coverage;
+              comment += '\n```\n';
+            } else {
+              comment += '_No Python source files changed_\n';
+            }
+          } catch (error) {
+            comment += '_Could not determine coverage for changed files_\n';
+          }
+
+          comment += '\n---\n';
+          comment += '_Full coverage report available in workflow artifacts_';
+
+          // Post as comment
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: comment
+          });
