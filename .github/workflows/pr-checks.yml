@@ -49,6 +49,7 @@ jobs:
 
     - name: Create PR comment
       if: always()
+      continue-on-error: true
       uses: actions/github-script@v7
       with:
         script: |
@@ -165,6 +166,7 @@ jobs:
 
     - name: Comment coverage on changed files
       if: always()
+      continue-on-error: true
       uses: actions/github-script@v7
       with:
         script: |
