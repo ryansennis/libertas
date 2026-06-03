@@ -1,8 +1,8 @@
 # libertas
 
 [![Test Suite](https://github.com/ryansennis/libertas/actions/workflows/test.yml/badge.svg)](https://github.com/ryansennis/libertas/actions/workflows/test.yml)
-[![Coverage](https://img.shields.io/badge/coverage-93.07%25-brightgreen)](https://github.com/ryansennis/libertas/actions/workflows/test.yml)
-[![Tests](https://img.shields.io/badge/tests-310%20passing-brightgreen)](https://github.com/ryansennis/libertas/actions/workflows/test.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ryansennis/libertas/main/.github/badges/coverage.json)](https://github.com/ryansennis/libertas/actions/workflows/test.yml)
+[![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ryansennis/libertas/main/.github/badges/tests.json)](https://github.com/ryansennis/libertas/actions/workflows/test.yml)
 [![Python](https://img.shields.io/badge/python-3.12-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -17,7 +17,11 @@ Libertas enables large-scale experiments to identify optimal organizational stru
 - **Constitutional Democracy**: Natural language constitutions that LLM agents can read and interpret
 - **Democratic Governance**: Multiple voting systems (simple majority, supermajority, unanimous)
 - **Economic Simulation**: Production, markets, resource management, and skill development
-- **Autonomous Agents**: LLM-powered workers with personalities, backgrounds, and decision-making
+- **Autonomous Agents**: LLM-powered workers with cognitive architecture
+  - Observe-reason-act loop for autonomous decision-making
+  - Personality traits (OCEAN + political dimensions)
+  - Dynamic mood system and episodic memory
+  - Constitutional permission checking
 - **Research-Oriented**: Designed for running batch experiments to derive statistical insights
 
 ## System Requirements
@@ -88,49 +92,49 @@ pip install -e ".[all]"
 
 ```python
 from libertas.organization import Federation, PodConfig, WorkerConfig
+from libertas.cognitive import PersonalityTraits, Background
 from libertas.governance import MotionType, VoteType
 from mesa_llm.reasoning.cot import CoTReasoning
 
-# Create a federation with a worker cooperative
-worker_config = WorkerConfig(
+# Create autonomous workers with different personalities
+alice_config = WorkerConfig(
     name="Alice",
     reasoning=CoTReasoning,
     llm_model="ollama/mistral",
-    initial_skills={"crafting": 3.0}
+    initial_currency=1000.0,
+    personality=PersonalityTraits(
+        openness=0.8,
+        conscientiousness=0.7,
+        extraversion=0.6,
+        agreeableness=0.7,
+        neuroticism=0.3,
+        economic_left_right=-0.7,  # Collectivist
+        authority_libertarian=0.5   # Libertarian
+    ),
+    background=Background(
+        education_level=4,
+        years_experience=5
+    )
 )
 
 pod_config = PodConfig(
     name="TechCoop",
-    workers=[worker_config]
+    workers=[alice_config],
+    initial_inventory={"wood": 1000.0}
 )
 
 federation = Federation(pods=[pod_config])
 
-# Read the constitution
-constitution_text = federation.constitution.get_full_text()
-print(constitution_text)
-
-# Propose and vote on a motion
-pod = list(federation)[0]
-workers = list(pod)
-
-motion = federation.governance.propose_motion(
-    proposer=workers[0],
-    motion_type=MotionType.PRODUCTION_PRIORITY,
-    title="Focus on tool production",
-    description="Prioritize tool manufacturing this quarter",
-    scope="pod",
-    eligible_voters={w.unique_id for w in workers},
-    voting_duration=50
-)
-
-# Workers vote
-federation.governance.cast_vote(motion.motion_id, workers[0].unique_id, "for")
-
-# Run simulation
+# Workers autonomously observe, reason, decide, and act each step
 for step in range(100):
-    federation.steps = step
-    federation.step()
+    federation.step()  # Workers automatically participate in governance and economy
+
+# Check worker state
+pod = federation[0]
+alice = list(pod)[0]
+print(f"Alice's mood: happiness={alice.mood.happiness:.2f}, stress={alice.mood.stress:.2f}")
+print(f"Alice's memory: {len(alice.episodic_memory)} episodes")
+print(f"Alice's currency: ${alice.currency:.2f}")
 ```
 
 ### Running Tests
@@ -205,9 +209,13 @@ See [scripts/README.md](scripts/README.md) for detailed testing documentation.
 
 **Worker** (`libertas.organization.worker`):
 - LLM-powered autonomous agents (via mesa_llm)
+- Cognitive loop: observe → reason → decide → act
+- Personality traits (OCEAN model + political dimensions)
+- Dynamic mood system (happiness, stress, motivation)
+- Episodic memory (rolling 100-entry window)
 - Skills, tools, and personal currency
 - Production work and market trading
-- Future: personality, mood, political views
+- Autonomous voting and governance participation
 
 ## Research Applications
 
@@ -272,8 +280,11 @@ libertas/
 │   │   ├── federation.py     # Top-level coordinator
 │   │   ├── pod.py            # Worker cooperatives
 │   │   └── worker.py         # LLM-powered agents
+│   ├── cognitive/            # Agent cognitive architecture
+│   │   └── __init__.py       # PersonalityTraits, Background, MoodState
 │   └── tools/                # LLM tools for agents
-│       └── economic_tools.py # Production, trading, invention
+│       ├── economic_tools.py # Production, trading, invention
+│       └── governance_tools.py # Voting, motions, constitution
 ├── scripts/                  # Utility scripts
 │   ├── test.py              # Unified test runner
 │   └── setup_ollama.py      # LLM setup
@@ -321,18 +332,23 @@ See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup and
 
 ### Roadmap
 
-**Phase 1: Foundation** (In Progress)
+**Phase 1: Foundation** ✅ **COMPLETE**
 - ✅ Constitutional democracy system
 - ✅ Voting and governance engine
 - ✅ Integration with Federation/Pod
-- ⏳ Agent personality and mood
-- ⏳ LLM tools for governance
+- ✅ Agent personality and mood
+- ✅ LLM tools for governance (EconomicTools, GovernanceTools)
+- ✅ Cognitive attributes (PersonalityTraits, Background, MoodState)
 
-**Phase 2: Cognitive Architecture**
-- Agent observe-reason-act loop
-- Memory systems (episodic, semantic)
-- Permission checking before actions
-- Autonomous decision-making
+**Phase 2: Cognitive Architecture** ✅ **COMPLETE**
+- ✅ Agent observe-reason-act loop
+- ✅ Memory systems (episodic memory)
+- ✅ Permission checking before actions
+- ✅ Autonomous decision-making
+- ✅ LLM-based reasoning with personality influence
+- ✅ Dynamic mood updates
+- ⏳ Semantic memory (planned)
+- ⏳ Explicit goal tracking (planned)
 
 **Phase 3: Advanced Economics**
 - Time-dependent tasks
