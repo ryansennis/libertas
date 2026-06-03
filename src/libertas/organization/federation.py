@@ -7,6 +7,7 @@ import networkx as nx
 import numpy as np
 
 from ..economy import ResourceRegistry, Resource, RecipeRegistry, Recipe, Market
+from ..governance import Constitution, GovernanceEngine
 
 SeedLike = int | np.integer | Sequence[int] | np.random.SeedSequence
 RNGLike = np.random.Generator | np.random.BitGenerator
@@ -22,16 +23,21 @@ class Federation(mesa.Model, MutableSet[Pod]):
         recipe_registry: Optional[RecipeRegistry] = None,
         market: Optional[Market] = None,
         initialize_market: bool = True,
+        constitution: Optional[Constitution] = None,
     ):
         # Call mesa.Model.__init__
         super().__init__(seed=seed, rng=rng)
-        
+
         # Track simulation step
         self.steps = 0
 
         # Initialize economic registries
         self.resource_registry = resource_registry or ResourceRegistry()
         self.recipe_registry = recipe_registry or RecipeRegistry()
+
+        # Initialize governance
+        self.constitution = constitution or Constitution.create_default_federation_constitution()
+        self.governance = GovernanceEngine()
 
         # Create pods with temporary coordinates
         pod_instances: List[Pod] = []
