@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from .federation import Federation
     from ..economy import ProductionJob, Resource
 
+from ..cognitive import PersonalityTraits, Background, MoodState
+
 @dataclass
 class WorkerConfig:
     name: str
@@ -25,7 +27,9 @@ class WorkerConfig:
     api_base: Optional[str] = None
     initial_skills: Optional[Dict[str, float]] = None
     initial_tools: Optional[List[str]] = None
-    initial_currency: float = 100.0  
+    initial_currency: float = 100.0
+    personality: Optional[PersonalityTraits] = None
+    background: Optional[Background] = None  
 
     @property
     def llm_inputs(self):
@@ -150,24 +154,48 @@ class Worker(LLMAgent):
                 if tool_template and tool_template.is_tool:
                     self._add_tool(tool_template)
         
+        # Cognitive attributes
+        self.personality = worker_config.personality or PersonalityTraits()
+        self.background = worker_config.background or Background()
+        self.mood = MoodState()
+
         # Initialize economic tools
         from ..tools.economic_tools import EconomicTools
         self.economic_tools = EconomicTools(self)
-        
+
+        # Initialize governance tools
+        from ..tools.governance_tools import GovernanceTools
+        self.governance_tools = GovernanceTools(self)
+
         # Register tools with LLMAgent's tool manager
         self._register_economic_tools()
+        self._register_governance_tools()
     
     def _register_economic_tools(self):
         """Register economic tools with the LLM agent's tool manager."""
         from ..tools.economic_tools import get_economic_tool_definitions
-        
+
         # Get tool definitions
         tool_defs = get_economic_tool_definitions()
-        
+
         # Register each tool with the tool manager
         for tool_def in tool_defs:
             tool_name = tool_def['function']['name']
             tool_func = getattr(self.economic_tools, tool_name, None)
+            if tool_func:
+                self.tool_manager.register(tool_func)
+
+    def _register_governance_tools(self):
+        """Register governance tools with the LLM agent's tool manager."""
+        from ..tools.governance_tools import get_governance_tool_definitions
+
+        # Get tool definitions
+        tool_defs = get_governance_tool_definitions()
+
+        # Register each tool with the tool manager
+        for tool_def in tool_defs:
+            tool_name = tool_def['function']['name']
+            tool_func = getattr(self.governance_tools, tool_name, None)
             if tool_func:
                 self.tool_manager.register(tool_func)
     
