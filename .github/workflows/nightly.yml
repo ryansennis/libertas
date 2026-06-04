@@ -33,7 +33,7 @@ jobs:
 
     - name: Run unit tests with coverage
       run: |
-        python scripts/test.py --unit --coverage
+        python scripts/test.py --all --coverage
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
