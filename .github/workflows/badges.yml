@@ -30,7 +30,7 @@ jobs:
     - name: Run tests and get coverage
       run: |
         python scripts/test.py --quick --coverage
-        COVERAGE=$(coverage report | grep "TOTAL" | awk '{print $NF}')
+        COVERAGE=$(python -m coverage report | grep "TOTAL" | awk '{print $NF}')
         echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
 
     - name: Count tests
