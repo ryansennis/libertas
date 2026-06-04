@@ -358,16 +358,17 @@ class Worker(LLMAgent):
         return self._federation.steps if hasattr(self._federation, 'steps') else 0
     
     # Production Methods
-    def assign_to_job(self, job: 'ProductionJob', step_index: int, 
+    def assign_to_job(self, job: 'ProductionJob', step_index: int,
                       current_step: int) -> bool:
         """Assign worker to a production job."""
         if self.current_job is not None:
             return False
-        
+
         self.current_job = job
         self.assigned_step_index = step_index
         self.step_start_step = current_step
         job.assign_worker(self.name, step_index)
+        job.start_current_step(current_step)
         return True
     
     def is_available(self) -> bool:

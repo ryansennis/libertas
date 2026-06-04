@@ -1,5 +1,6 @@
 """Integration tests for autonomous agent governance behavior."""
 
+import json
 import pytest
 from mesa_llm.reasoning.cot import CoTReasoning
 from libertas.organization import Federation, PodConfig, WorkerConfig
@@ -98,7 +99,7 @@ def test_agent_votes_on_motion():
         description="Testing voting",
         scope="pod"
     )
-    motion_id = eval(result)["motion_id"]
+    motion_id = json.loads(result)["motion_id"]
 
     # Bob votes
     vote_result = bob.governance_tools.vote_on_motion(motion_id, "for")
@@ -131,7 +132,7 @@ def test_agent_lists_active_motions():
 
     assert "active_motions" in result
     assert "count" in result
-    motions = eval(result)
+    motions = json.loads(result)
     assert motions["count"] == 2
 
 
@@ -155,7 +156,7 @@ def test_agent_get_motion_details():
         description="Very important governance decision",
         scope="pod"
     )
-    motion_id = eval(result)["motion_id"]
+    motion_id = json.loads(result)["motion_id"]
 
     # Get details
     details = alice.governance_tools.get_motion_details(motion_id)

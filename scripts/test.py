@@ -10,7 +10,6 @@ Examples:
     python scripts/test.py --quick             # Run unit tests only
     python scripts/test.py --unit              # Run unit tests
     python scripts/test.py --integration       # Run integration tests
-    python scripts/test.py --e2e               # Run E2E tests
     python scripts/test.py --coverage          # Run with coverage report
     python scripts/test.py --filter worker     # Run tests matching "worker"
     python scripts/test.py --unit --coverage   # Unit tests with coverage
@@ -51,11 +50,8 @@ def run_tests(
     elif test_type == "integration":
         cmd.extend(["-m", "integration"])
         print("🔗 Running integration tests...")
-    elif test_type == "e2e":
-        cmd.extend(["-m", "e2e"])
-        print("🌍 Running E2E tests...")
     else:  # all
-        cmd.extend(["-m", "unit or integration or e2e"])
+        cmd.extend(["-m", "unit or integration"])
         print("🚀 Running all tests...")
 
     # Add filter pattern if specified
@@ -122,10 +118,8 @@ def list_tests(test_type="all", filter_pattern=None):
         cmd.extend(["-m", "unit"])
     elif test_type == "integration":
         cmd.extend(["-m", "integration"])
-    elif test_type == "e2e":
-        cmd.extend(["-m", "e2e"])
     else:
-        cmd.extend(["-m", "unit or integration or e2e"])
+        cmd.extend(["-m", "unit or integration"])
 
     if filter_pattern:
         cmd.extend(["-k", filter_pattern])
@@ -144,7 +138,6 @@ Examples:
   %(prog)s --quick                 Run unit tests only (fast)
   %(prog)s --unit                  Run unit tests
   %(prog)s --integration           Run integration tests
-  %(prog)s --e2e                   Run end-to-end tests
   %(prog)s --coverage              Run all tests with coverage
   %(prog)s --filter worker         Run tests matching "worker"
   %(prog)s --unit --coverage       Unit tests with coverage
@@ -183,13 +176,6 @@ Examples:
         const="integration",
         dest="test_type",
         help="Run integration tests"
-    )
-    type_group.add_argument(
-        "--e2e",
-        action="store_const",
-        const="e2e",
-        dest="test_type",
-        help="Run end-to-end tests"
     )
 
     # Other options

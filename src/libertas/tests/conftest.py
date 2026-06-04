@@ -75,11 +75,13 @@ def recipe_registry():
 
 @pytest.fixture
 def basic_worker_config():
-    """Create a basic worker configuration for testing."""
+    """Create a basic worker configuration for testing (non-autonomous)."""
+    from unittest.mock import Mock
     return WorkerConfig(
         name="worker_001",
-        reasoning=CoTReasoning,
-        llm_model="ollama/tinyllama",
+        reasoning=Mock,  # Mock reasoning for non-autonomous tests
+        llm_model="ollama/tinyllama",  # Use Ollama to avoid API key requirements
+        api_base="http://localhost:9999",  # Non-existent endpoint (will be caught by try-except)
         initial_currency=500.0,
         initial_skills={"crafting": 2.0, "smelting": 1.5},
         initial_tools=["hammer"]
@@ -98,14 +100,21 @@ def basic_pod_config(basic_worker_config):
 
 @pytest.fixture
 def basic_federation(basic_pod_config, resource_registry, recipe_registry):
-    """Create a basic federation for testing."""
+    """Create a basic federation for testing (non-autonomous)."""
     fed = Federation(
         pods=[basic_pod_config],
         resource_registry=resource_registry,
         recipe_registry=recipe_registry,
-        initialize_market=True
+        initialize_market=True,
+        enable_cognitive_loop=False  # Disable for basic tests
     )
     fed.steps = 100  # Set initial step count for tests
+
+    # Disable memory display to prevent Rich console issues in tests
+    for pod in fed:
+        for worker in pod:
+            worker.memory.display = False
+
     return fed
 
 

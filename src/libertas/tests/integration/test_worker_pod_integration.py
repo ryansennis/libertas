@@ -133,6 +133,9 @@ class TestWorkerPodIntegration:
             if worker.current_job is None:
                 break
 
+        # Process production one final time to move completed job to completed_jobs
+        pod.process_production(federation.steps)
+
         # Verify job completed within reasonable time
         assert worker.current_job is None, f"Job did not complete after {max_steps} steps"
         assert len(pod.completed_jobs) == 1

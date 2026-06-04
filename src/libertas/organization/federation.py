@@ -24,12 +24,14 @@ class Federation(mesa.Model, MutableSet[Pod]):
         market: Optional[Market] = None,
         initialize_market: bool = True,
         constitution: Optional[Constitution] = None,
+        enable_cognitive_loop: bool = True,
     ):
         # Call mesa.Model.__init__
         super().__init__(seed=seed, rng=rng)
 
         # Track simulation step
         self.steps = 0
+        self.enable_cognitive_loop = enable_cognitive_loop
 
         # Initialize economic registries
         self.resource_registry = resource_registry or ResourceRegistry()
@@ -322,13 +324,18 @@ class Federation(mesa.Model, MutableSet[Pod]):
                     if buyer_worker.subtract_currency(cost):
                         seller_worker.add_currency(cost)
 
-        # Autonomous agent cognitive loop
-        for pod in self._pods:
-            for worker in pod:
-                cognitive_result = worker.observe_and_reason()
-                actions = cognitive_result.get("actions", [])
-                if actions:
-                    worker.execute_actions(actions)
+        # Autonomous agent cognitive loop (only if enabled)
+        if self.enable_cognitive_loop:
+            for pod in self._pods:
+                for worker in pod:
+                    try:
+                        cognitive_result = worker.observe_and_reason()
+                        actions = cognitive_result.get("actions", [])
+                        if actions:
+                            worker.execute_actions(actions)
+                    except Exception:
+                        # Skip cognitive loop if LLM unavailable or worker not properly configured
+                        pass
 
         # Process governance votes
         if hasattr(self, 'governance') and self.governance:
