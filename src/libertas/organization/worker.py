@@ -160,8 +160,10 @@ class Worker(LLMAgent):
         self.mood = MoodState()
 
         # Memory systems
+        from ..cognitive import SemanticMemory, GoalSystem
         self.episodic_memory: List[Dict] = []  # Recent experiences (observations + mood)
-        self.current_goals: List[str] = []  # Current goals (e.g., ["earn_currency", "vote_on_motions"])
+        self.semantic_memory = SemanticMemory()  # Learned facts and patterns
+        self.goals = GoalSystem()  # Active, achieved, and abandoned goals
 
         # Initialize economic tools
         from ..tools.economic_tools import EconomicTools
@@ -174,6 +176,10 @@ class Worker(LLMAgent):
         # Register tools with LLMAgent's tool manager
         self._register_economic_tools()
         self._register_governance_tools()
+
+        # Generate initial goals based on personality
+        # Note: This will only work after federation is set
+        # We'll call it again in observe_and_reason if needed
     
     def _register_economic_tools(self):
         """Register economic tools with the LLM agent's tool manager."""
@@ -493,10 +499,21 @@ class Worker(LLMAgent):
         self._update_memory(observations)
         self._update_mood_from_observations(observations)
 
-        # 3. Reason about situation (using LLM)
+        # 3. Learn from accumulated experience (every 10 steps)
+        if len(self.episodic_memory) % 10 == 0 and len(self.episodic_memory) >= 10:
+            self._learn_from_experience()
+
+        # 4. Generate initial goals if we don't have any yet
+        if not self.goals.active_goals and not self.goals.achieved_goals:
+            self._generate_initial_goals()
+
+        # 5. Evaluate progress on goals
+        self._evaluate_goals()
+
+        # 5. Reason about situation (using LLM)
         reasoning = self._reason_about_situation(observations)
 
-        # 4. Decide on actions based on reasoning and permissions
+        # 6. Decide on actions based on reasoning and permissions
         actions = self._decide_actions(reasoning)
 
         return {
@@ -627,7 +644,10 @@ class Worker(LLMAgent):
                 "motivation": self.mood.motivation
             },
             "observations": observations,
-            "current_goals": self.current_goals
+            "current_goals": [
+                {"description": g.description, "priority": g.priority, "progress": g.progress}
+                for g in self.goals.active_goals
+            ]
         }
 
         # Construct reasoning prompt
@@ -649,34 +669,50 @@ class Worker(LLMAgent):
         """Build prompt for LLM reasoning."""
         pod_name = self.pod.name if self.pod else "no pod"
 
-        # Determine personality descriptions
-        econ_lean = context['personality']['economic_lean']
-        auth_lean = context['personality']['authority_lean']
+        # Determine personality descriptions (with defaults for missing keys)
+        econ_lean = context.get('personality', {}).get('economic_lean', 0.0)
+        auth_lean = context.get('personality', {}).get('authority_lean', 0.0)
 
         econ_desc = "collectivist" if econ_lean < 0 else "individualist"
         auth_desc = "hierarchical" if auth_lean < 0 else "libertarian"
+
+        # Get learned knowledge and goals
+        learned_insights = self._get_relevant_insights(context.get('observations', {}))
+        goals_formatted = self._format_goals_for_prompt()
+
+        personality = context.get('personality', {})
+        mood = context.get('mood', {})
 
         return f"""You are {self.name}, a worker in {pod_name}.
 
 PERSONALITY:
 - Economic lean: {econ_desc} ({econ_lean:.2f})
 - Authority view: {auth_desc} ({auth_lean:.2f})
-- Openness: {context['personality']['openness']:.2f}
-- Conscientiousness: {context['personality']['conscientiousness']:.2f}
+- Openness: {personality.get('openness', 0.5):.2f}
+- Conscientiousness: {personality.get('conscientiousness', 0.5):.2f}
 
 CURRENT STATE:
-- Happiness: {context['mood']['happiness']:.2f}
-- Stress: {context['mood']['stress']:.2f}
-- Motivation: {context['mood']['motivation']:.2f}
+- Happiness: {mood.get('happiness', 0.5):.2f}
+- Stress: {mood.get('stress', 0.5):.2f}
+- Motivation: {mood.get('motivation', 0.5):.2f}
 - Currency: {self.currency:.2f}
 
 SITUATION:
-- Pod inventory: {context['observations']['pod_state'].get('inventory', {})}
-- Market prices: {context['observations']['market_state'].get('prices', {})}
-- Active votes: {len(context['observations']['active_motions'].get('active_motions', []))}
-- Nearby workers: {context['observations']['local_workers'].get('count', 0)}
+- Pod inventory: {context['observations'].get('pod_state', {}).get('inventory', {})}
+- Market prices: {context['observations'].get('market_state', {}).get('prices', {})}
+- Active votes: {len(context['observations'].get('active_motions', {}).get('active_motions', []))}
+- Nearby workers: {context['observations'].get('local_workers', {}).get('count', 0)}
 
-Based on your personality and situation, answer:
+LEARNED KNOWLEDGE:
+- Market insights: {learned_insights['market']}
+- Trusted workers: {learned_insights['social']}
+- Production expertise: {learned_insights['production']}
+- Governance patterns: {learned_insights['governance']}
+
+CURRENT GOALS:
+{goals_formatted}
+
+Based on your personality, situation, learned knowledge, and goals, answer:
 1. What concerns you most right now?
 2. What opportunities do you see?
 3. What actions would you take next? (vote, produce, trade, propose motion)
@@ -841,3 +877,323 @@ Respond in JSON format:
                 results.append({"action": action_type, "error": str(e)})
 
         return results
+
+    # ============================================================================
+    # Learning Methods - Extract knowledge from experience
+    # ============================================================================
+
+    def _learn_from_experience(self) -> None:
+        """Extract knowledge from episodic memory and store in semantic memory."""
+        if len(self.episodic_memory) < 5:
+            return  # Need minimum history to learn patterns
+
+        self._learn_market_patterns()
+        self._learn_social_patterns()
+        self._learn_production_patterns()
+        self._learn_governance_patterns()
+
+    def _learn_market_patterns(self) -> None:
+        """Learn price trends and market insights from observations."""
+        # Extract price data from recent episodic memory
+        for memory in self.episodic_memory[-20:]:  # Look at last 20 observations
+            obs = memory.get("observations", {})
+            market_state = obs.get("market_state", {})
+            prices = market_state.get("prices", {})
+
+            # Store price history
+            for resource, price in prices.items():
+                if resource not in self.semantic_memory.price_patterns:
+                    self.semantic_memory.price_patterns[resource] = []
+                self.semantic_memory.price_patterns[resource].append(price)
+
+                # Keep only last 50 prices per resource
+                if len(self.semantic_memory.price_patterns[resource]) > 50:
+                    self.semantic_memory.price_patterns[resource] = \
+                        self.semantic_memory.price_patterns[resource][-50:]
+
+        # Generate insights from price patterns
+        self._generate_market_insights()
+
+    def _generate_market_insights(self) -> None:
+        """Generate natural language insights from price patterns."""
+        for resource, prices in self.semantic_memory.price_patterns.items():
+            if len(prices) < 10:
+                continue
+
+            # Calculate basic statistics
+            avg_price = sum(prices) / len(prices)
+            recent_avg = sum(prices[-5:]) / min(5, len(prices))
+
+            # Detect trends
+            if recent_avg > avg_price * 1.2:
+                insight = f"{resource} prices are rising (recent: {recent_avg:.2f}, avg: {avg_price:.2f})"
+                if insight not in self.semantic_memory.market_insights:
+                    self.semantic_memory.market_insights.append(insight)
+            elif recent_avg < avg_price * 0.8:
+                insight = f"{resource} prices are falling (recent: {recent_avg:.2f}, avg: {avg_price:.2f})"
+                if insight not in self.semantic_memory.market_insights:
+                    self.semantic_memory.market_insights.append(insight)
+
+        # Keep only most recent 10 insights
+        if len(self.semantic_memory.market_insights) > 10:
+            self.semantic_memory.market_insights = self.semantic_memory.market_insights[-10:]
+
+    def _learn_social_patterns(self) -> None:
+        """Learn about other workers' behaviors and build trust."""
+        # Extract social interactions from memory
+        for memory in self.episodic_memory[-20:]:
+            obs = memory.get("observations", {})
+            local_workers = obs.get("local_workers", {})
+
+            for worker_info in local_workers.get("workers", []):
+                worker_name = worker_info.get("name")
+                if not worker_name:
+                    continue
+
+                # Initialize worker behavior tracking
+                if worker_name not in self.semantic_memory.worker_behaviors:
+                    self.semantic_memory.worker_behaviors[worker_name] = {
+                        "interactions": 0,
+                        "jobs_seen": [],
+                        "moods_observed": []
+                    }
+
+                # Track interactions
+                self.semantic_memory.worker_behaviors[worker_name]["interactions"] += 1
+
+                # Track their activities
+                current_job = worker_info.get("current_job")
+                if current_job:
+                    jobs = self.semantic_memory.worker_behaviors[worker_name]["jobs_seen"]
+                    if current_job not in jobs:
+                        jobs.append(current_job)
+
+                # Track their mood
+                mood = worker_info.get("mood", {})
+                if mood:
+                    self.semantic_memory.worker_behaviors[worker_name]["moods_observed"].append(mood)
+
+                # Update trust based on interactions
+                interactions = self.semantic_memory.worker_behaviors[worker_name]["interactions"]
+                # Trust grows slowly with repeated positive interactions
+                self.semantic_memory.trusted_workers[worker_name] = min(1.0, interactions / 50.0)
+
+    def _learn_production_patterns(self) -> None:
+        """Learn production efficiency and skill mastery."""
+        # Track completed jobs and time taken
+        for memory in self.episodic_memory[-20:]:
+            obs = memory.get("observations", {})
+            pod_state = obs.get("pod_state", {})
+
+            # If we have an active job, track it
+            if self.current_job:
+                recipe_name = self.current_job.recipe.name
+
+                # Initialize efficiency tracking
+                if recipe_name not in self.semantic_memory.recipe_efficiency:
+                    self.semantic_memory.recipe_efficiency[recipe_name] = 1.0
+
+        # Track skill usage and mastery
+        for skill_name, skill_level in self.skills.items():
+            # Update mastery based on current skill level
+            mastery = min(10, int(skill_level))
+            self.semantic_memory.skill_mastery[skill_name] = mastery
+
+    def _learn_governance_patterns(self) -> None:
+        """Learn governance dynamics and motion outcomes."""
+        # Track motion outcomes from observations
+        for memory in self.episodic_memory[-20:]:
+            obs = memory.get("observations", {})
+            active_motions = obs.get("active_motions", {})
+
+            for motion in active_motions.get("active_motions", []):
+                motion_type = motion.get("type")
+                if motion_type:
+                    # We'll update this when we see motions complete
+                    # For now, just track that we've seen this motion type
+                    if motion_type not in self.semantic_memory.motion_outcomes:
+                        self.semantic_memory.motion_outcomes[motion_type] = False
+
+        # Learn constitutional patterns through experience
+        permissions = None
+        for memory in self.episodic_memory[-20:]:
+            obs = memory.get("observations", {})
+            permissions = obs.get("my_permissions", {})
+            if permissions:
+                break
+
+        if permissions:
+            # Generate insights about permissions
+            rules = []
+            if permissions.get("can_vote"):
+                rules.append("I have voting rights")
+            if permissions.get("can_propose"):
+                rules.append("I can propose motions")
+            if permissions.get("can_create_pod"):
+                rules.append("I can create new pods")
+
+            # Add new rules
+            for rule in rules:
+                if rule not in self.semantic_memory.constitution_rules:
+                    self.semantic_memory.constitution_rules.append(rule)
+
+            # Keep only last 10 rules
+            if len(self.semantic_memory.constitution_rules) > 10:
+                self.semantic_memory.constitution_rules = \
+                    self.semantic_memory.constitution_rules[-10:]
+
+    def _get_relevant_insights(self, observations: Dict) -> Dict:
+        """Extract relevant knowledge from semantic memory based on current situation."""
+        insights = {
+            "market": [],
+            "social": [],
+            "production": [],
+            "governance": []
+        }
+
+        # Market insights
+        if observations.get("market_state"):
+            insights["market"] = self.semantic_memory.market_insights[-3:] if self.semantic_memory.market_insights else []
+
+        # Social insights - most trusted workers
+        if observations.get("local_workers"):
+            trusted = sorted(
+                self.semantic_memory.trusted_workers.items(),
+                key=lambda x: x[1],
+                reverse=True
+            )[:3]
+            insights["social"] = [f"{name} (trust: {trust:.2f})" for name, trust in trusted]
+
+        # Production insights - mastered skills
+        mastered_skills = [
+            f"{skill} (level {level})"
+            for skill, level in self.semantic_memory.skill_mastery.items()
+            if level >= 5
+        ]
+        insights["production"] = mastered_skills[:3]
+
+        # Governance insights
+        insights["governance"] = self.semantic_memory.constitution_rules[-3:]
+
+        return insights
+
+    # ============================================================================
+    # Goal Management Methods - Track and pursue objectives
+    # ============================================================================
+
+    def _evaluate_goals(self) -> None:
+        """Evaluate progress on all active goals."""
+        if not self.federation:
+            return
+
+        for goal in self.goals.active_goals[:]:  # Copy list to allow removal during iteration
+            current_value = self._get_goal_metric_value(goal)
+
+            if current_value is not None:
+                progress = goal.evaluate_progress(current_value)
+                self.goals.update_progress(goal.goal_id, progress)
+
+            # Check deadlines
+            if goal.deadline_step and self.federation.steps > goal.deadline_step:
+                self.goals.abandon_goal(goal.goal_id, "deadline_passed")
+
+    def _get_goal_metric_value(self, goal) -> Optional[float]:
+        """Get current value for a goal's target metric."""
+        from ..cognitive import Goal
+
+        if goal.goal_type == "economic":
+            if goal.target_metric == "currency":
+                return self.currency
+            elif goal.target_metric == "tools":
+                return float(sum(len(tools) for tools in self.tools.values()))
+
+        elif goal.goal_type == "social":
+            if goal.target_metric == "avg_trust":
+                if self.semantic_memory.trusted_workers:
+                    return sum(self.semantic_memory.trusted_workers.values()) / \
+                           len(self.semantic_memory.trusted_workers)
+            elif goal.target_metric in self.semantic_memory.trusted_workers:
+                return self.semantic_memory.trusted_workers[goal.target_metric]
+
+        elif goal.goal_type == "learning":
+            if goal.target_metric in self.semantic_memory.skill_mastery:
+                return float(self.semantic_memory.skill_mastery[goal.target_metric])
+
+        elif goal.goal_type == "governance":
+            if goal.target_metric == "successful_motions":
+                return float(sum(1 for outcome in self.semantic_memory.motion_outcomes.values() if outcome))
+
+        return None
+
+    def _generate_initial_goals(self) -> None:
+        """Generate initial goals based on personality traits."""
+        if not self.federation:
+            return
+
+        import uuid
+        from ..cognitive import Goal
+
+        # Economic goals for individualists
+        if self.personality.economic_left_right > 0.5:
+            self.goals.add_goal(Goal(
+                goal_id=str(uuid.uuid4()),
+                goal_type="economic",
+                description="Accumulate personal wealth",
+                target_metric="currency",
+                target_value=5000.0,
+                priority=0.8,
+                created_step=self.federation.steps if self.federation else 0
+            ))
+
+        # Social goals for collectivists
+        if self.personality.economic_left_right < -0.5:
+            self.goals.add_goal(Goal(
+                goal_id=str(uuid.uuid4()),
+                goal_type="social",
+                description="Build cooperative alliances",
+                target_metric="avg_trust",
+                target_value=0.8,
+                priority=0.7,
+                created_step=self.federation.steps if self.federation else 0
+            ))
+
+        # Governance goals for libertarians
+        if abs(self.personality.authority_libertarian) > 0.6:
+            self.goals.add_goal(Goal(
+                goal_id=str(uuid.uuid4()),
+                goal_type="governance",
+                description="Influence governance outcomes",
+                target_metric="successful_motions",
+                target_value=5.0,
+                priority=0.6,
+                created_step=self.federation.steps if self.federation else 0
+            ))
+
+        # Learning goals for highly open personalities
+        if self.personality.openness > 0.7:
+            # Pick a skill to master
+            if self.skills:
+                skill_to_master = list(self.skills.keys())[0]
+                self.goals.add_goal(Goal(
+                    goal_id=str(uuid.uuid4()),
+                    goal_type="learning",
+                    description=f"Master {skill_to_master} skill",
+                    target_metric=skill_to_master,
+                    target_value=8.0,
+                    priority=0.5,
+                    created_step=self.federation.steps if self.federation else 0
+                ))
+
+    def _format_goals_for_prompt(self) -> str:
+        """Format active goals for inclusion in reasoning prompt."""
+        if not self.goals.active_goals:
+            return "No active goals"
+
+        goal_strs = []
+        for goal in self.goals.get_active_goals_by_priority()[:3]:  # Top 3 goals
+            progress_pct = int(goal.progress * 100)
+            goal_strs.append(
+                f"- {goal.description} ({goal.goal_type}, priority: {goal.priority:.1f}, progress: {progress_pct}%)"
+            )
+
+        return "\n".join(goal_strs)
