@@ -21,11 +21,15 @@ class Tool:
 
     def use(self) -> bool:
         """Use tool, degrade durability. Returns True if still usable."""
+        if self.durability is None:
+            return True  # Infinite durability
         self.durability = max(0, self.durability - 1)
         return self.durability > 0
 
     def is_broken(self) -> bool:
         """Check if tool is broken."""
+        if self.durability is None:
+            return False  # Infinite durability never breaks
         return self.durability <= 0
 
     def repair(self, amount: Optional[int] = None) -> float:
