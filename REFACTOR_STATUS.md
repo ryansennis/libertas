@@ -2,16 +2,16 @@
 
 **Branch:** `refactor/resources-inventory-hierarchy`  
 **Date:** 2026-06-08  
-**Status:** In Progress (Phase 3 of 7)
+**Status:** In Progress (Phase 4 of 7, ~57% complete)
 
 ---
 
 ## Test Results ✅
 
 ### All Tests Passing
-- **Unit Tests:** 653 passed ✅
+- **Unit Tests:** 678 passed ✅ (653 + 25 new resource tests)
 - **Integration Tests:** 38 passed ✅
-- **Total:** 691 tests passed ✅
+- **Total:** 716 tests passed ✅
 - **Test Coverage:** 88.24% (required: 70%) ✅
 - **Warnings:** 548 (mostly deprecation warnings from Mesa framework)
 
@@ -79,12 +79,19 @@ Progress so far:
 
 ## Remaining Phases
 
-### ⏳ Phase 4: Migrate Inventory Access
-- Replace direct `.quantities` access → `.materials` or `.get_material_quantity()`
-- Replace direct `.instances` access → `.tools` or `.count_tools()`
-- Update pod.py inventory methods (get_inventory_summary, get_tools_summary)
-- Update worker.py observations
-- Update all test assertions
+### 🔄 Phase 4: Migrate Inventory Access (PARTIAL)
+**Commit:** `a7610ef`
+
+Progress so far:
+- ✅ Updated Pod._get_available_inputs() to use materials dict
+- ✅ Updated Pod.get_inventory_summary() to use materials + consumables
+- ✅ Updated Pod.get_tools_summary() to use tools dict  
+- ✅ Updated Worker._observe_pod() to use method instead of direct access
+- ⏳ Test assertions still use old system (intentional for now)
+
+**Remaining work:**
+- Update any remaining direct inventory access in other modules
+- Consider updating test assertions (may keep for regression testing)
 
 ### ⏳ Phase 5: Add Worker Needs System
 - Create `src/libertas/cognitive/needs.py` with `WorkerNeeds` class
@@ -140,10 +147,11 @@ inventory.tools = {"uuid1": Tool(...)}
 
 ## Key Metrics
 
-- **Total Commits:** 3 (Phase 1, 2, 3 partial)
-- **Files Changed:** 13
-- **Lines Added:** ~1,164
-- **Tests:** All passing (691/691)
+- **Total Commits:** 7 (Phases 1, 2, 3 complete; Phase 4 partial)
+- **Files Changed:** 18
+- **Lines Added:** ~1,522
+- **Tests:** All passing (716/716)
+- **New Tests Added:** 25 (Material + Tool classes)
 - **Coverage:** 88.24%
 - **Breaking Changes:** 0 (parallel systems prevent breaks)
 
