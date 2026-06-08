@@ -182,7 +182,7 @@ class TestWorkerGoalSystem:
         assert hasattr(self.worker, 'goals')
         assert isinstance(self.worker.goals, GoalSystem)
         assert self.worker.goals.active_goals == []
-        assert self.worker.goals.achieved_goals == []
+        assert self.worker.goals.completed_goals == []
         assert self.worker.goals.abandoned_goals == []
 
     def test_worker_can_add_goals(self):
@@ -221,7 +221,7 @@ class TestWorkerGoalSystem:
         # Achieve goal
         self.worker.goals.update_progress("skill_farming", 1.0)
         assert len(self.worker.goals.active_goals) == 0
-        assert len(self.worker.goals.achieved_goals) == 1
+        assert len(self.worker.goals.completed_goals) == 1
 
     def test_worker_goal_abandonment(self):
         """Test abandoning worker goals."""
@@ -240,7 +240,7 @@ class TestWorkerGoalSystem:
 
         assert len(self.worker.goals.active_goals) == 0
         assert len(self.worker.goals.abandoned_goals) == 1
-        assert "deadline_passed" in self.worker.goals.abandoned_goals[0].status
+        assert self.worker.goals.abandoned_goals[0].abandon_reason == "deadline_passed"
 
     def test_worker_multiple_goals(self):
         """Test worker managing multiple goals."""

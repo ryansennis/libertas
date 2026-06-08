@@ -505,7 +505,7 @@ class Worker(LLMAgent):
             self._learn_from_experience()
 
         # 4. Generate initial goals if we don't have any yet
-        if not self.goals.active_goals and not self.goals.achieved_goals:
+        if not self.goals.active_goals and not self.goals.completed_goals:
             self._generate_initial_goals()
 
         # 5. Evaluate progress on goals

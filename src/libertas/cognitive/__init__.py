@@ -3,7 +3,7 @@
 from .personality import PersonalityTraits, Background
 from .mood import MoodState
 from .memory import SemanticMemory
-from .goals import Goal, GoalSystem
+from .goals import Goal, GoalSystem, GoalStatus
 
 __all__ = [
     "PersonalityTraits",
@@ -12,4 +12,5 @@ __all__ = [
     "SemanticMemory",
     "Goal",
     "GoalSystem",
+    "GoalStatus",
 ]
