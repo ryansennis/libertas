@@ -600,7 +600,7 @@ class Worker(LLMAgent):
             return {"error": "Not in a pod"}
 
         return {
-            "inventory": dict(self.pod.inventory.quantities),
+            "inventory": self.pod.get_inventory_summary(),  # Use method instead of direct access
             "active_jobs": len(self.pod.active_jobs),
             "workers_count": self.pod.num_workers(),
             "available_recipes": self.federation.list_recipes() if self.federation else []

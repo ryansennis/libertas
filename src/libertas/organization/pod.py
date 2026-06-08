@@ -184,7 +184,14 @@ class Pod(AgentSet[Worker]):
         return True, job.job_id
     
     def _get_available_inputs(self) -> Dict[str, float]:
-        """Get current inventory levels for recipe checking."""
+        """Get current inventory levels for recipe checking.
+
+        During migration: use new system if available, fallback to old.
+        """
+        # Try new system first
+        if hasattr(self.inventory, 'materials') and self.inventory.materials:
+            return {name: mat.quantity for name, mat in self.inventory.materials.items()}
+        # Fallback to old system
         return self.inventory.quantities.copy()
     
     def process_production(self, simulation_step: int):
@@ -237,13 +244,36 @@ class Pod(AgentSet[Worker]):
             worker.step()
     
     def get_inventory_summary(self) -> Dict[str, float]:
-        """Get summary of current inventory."""
+        """Get summary of current inventory.
+
+        During migration: use new system if available, fallback to old.
+        """
+        # Try new system first
+        if hasattr(self.inventory, 'materials') and self.inventory.materials:
+            result = {name: mat.quantity for name, mat in self.inventory.materials.items()}
+            # Also include consumables if present
+            if hasattr(self.inventory, 'consumables') and self.inventory.consumables:
+                for name, cons in self.inventory.consumables.items():
+                    result[name] = result.get(name, 0) + cons.quantity
+            return result
+        # Fallback to old system
         return self.inventory.quantities.copy()
     
     def get_tools_summary(self) -> Dict[str, int]:
-        """Get summary of tools in inventory."""
+        """Get summary of tools in inventory.
+
+        During migration: use new system if available, fallback to old.
+        """
+        # Try new system first
+        if hasattr(self.inventory, 'tools') and self.inventory.tools:
+            tool_counts = {}
+            for tool_id, tool in self.inventory.tools.items():
+                name = tool.info.name
+                tool_counts[name] = tool_counts.get(name, 0) + 1
+            return tool_counts
+        # Fallback to old system
         return {
-            name: len(tools) 
+            name: len(tools)
             for name, tools in self.inventory.instances.items()
         }
     
