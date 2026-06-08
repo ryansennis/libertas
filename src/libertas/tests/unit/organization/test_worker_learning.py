@@ -36,6 +36,7 @@ def worker(federation):
     return pod.get_worker_by_index(0)
 
 
+@pytest.mark.unit
 class TestWorkerLearning:
     """Test worker learning from experience."""
 
@@ -180,6 +181,7 @@ class TestWorkerLearning:
         assert "governance" in insights
 
 
+@pytest.mark.unit
 class TestWorkerGoals:
     """Test worker goal management."""
 
@@ -384,6 +386,7 @@ class TestWorkerGoals:
         assert "50%" in formatted or "0.5" in formatted  # Progress
 
 
+@pytest.mark.unit
 class TestWorkerCognitiveLoopIntegration:
     """Test integration of learning and goals into cognitive loop."""
 

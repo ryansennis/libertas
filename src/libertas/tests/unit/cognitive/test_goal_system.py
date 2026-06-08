@@ -4,6 +4,7 @@ import pytest
 from libertas.cognitive import Goal, GoalSystem
 
 
+@pytest.mark.unit
 class TestGoal:
     """Test Goal dataclass."""
 
@@ -95,6 +96,7 @@ class TestGoal:
             assert goal.status == status
 
 
+@pytest.mark.unit
 class TestGoalSystem:
     """Test GoalSystem class."""
 

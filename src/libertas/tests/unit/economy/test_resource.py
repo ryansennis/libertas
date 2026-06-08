@@ -124,6 +124,7 @@ class TestResource(unittest.TestCase):
         self.assertTrue("rarity" in resource.properties)
 
 
+@pytest.mark.unit
 class TestInventory(unittest.TestCase):
     """Test Inventory class functionality."""
     
@@ -217,6 +218,7 @@ class TestInventory(unittest.TestCase):
         self.assertEqual(len(restored.instances.get("hammer", [])), 2)
 
 
+@pytest.mark.unit
 class TestResourceRegistry(unittest.TestCase):
     """Test ResourceRegistry class functionality."""
     
@@ -267,6 +269,7 @@ class TestResourceRegistry(unittest.TestCase):
         self.assertFalse(self.registry.is_known("unknown_resource"))
 
 
+@pytest.mark.unit
 class TestResourceEdgeCases(unittest.TestCase):
     """Test edge cases for resource system."""
     

@@ -58,6 +58,7 @@ def basic_federation():
     return federation
 
 
+@pytest.mark.unit
 class TestObservationMethods:
     """Test worker observation methods."""
 
@@ -167,6 +168,7 @@ class TestObservationMethods:
         assert distance == pytest.approx(5.0)
 
 
+@pytest.mark.unit
 class TestReasoningMethods:
     """Test worker reasoning and action decision methods."""
 
@@ -224,6 +226,7 @@ class TestReasoningMethods:
         assert len(actions) <= len(reasoning["recommended_actions"])
 
 
+@pytest.mark.unit
 class TestMemoryMethods:
     """Test worker memory management."""
 
@@ -262,6 +265,7 @@ class TestMemoryMethods:
         assert alice.episodic_memory[-1]["observations"]["test"] == 109
 
 
+@pytest.mark.unit
 class TestMoodMethods:
     """Test mood update logic."""
 
@@ -355,6 +359,7 @@ class TestMoodMethods:
         assert bob.mood.motivation >= initial_motivation - 0.01
 
 
+@pytest.mark.unit
 class TestFullCognitiveLoop:
     """Test the complete observe_and_reason flow."""
 
@@ -401,6 +406,7 @@ class TestFullCognitiveLoop:
         assert 0.0 <= alice.mood.happiness <= 1.0
 
 
+@pytest.mark.unit
 class TestActionExecution:
     """Test action execution methods."""
 
