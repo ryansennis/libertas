@@ -347,8 +347,8 @@ See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup and
 - ✅ Autonomous decision-making
 - ✅ LLM-based reasoning with personality influence
 - ✅ Dynamic mood updates
-- ⏳ Semantic memory (planned)
-- ⏳ Explicit goal tracking (planned)
+- ✅ Semantic memory
+- ✅ Explicit goal tracking
 
 **Phase 3: Advanced Economics**
 - Time-dependent tasks

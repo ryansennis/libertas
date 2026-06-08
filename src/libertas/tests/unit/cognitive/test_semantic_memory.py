@@ -4,6 +4,7 @@ import pytest
 from libertas.cognitive import SemanticMemory
 
 
+@pytest.mark.unit
 class TestSemanticMemory:
     """Test SemanticMemory dataclass."""
 

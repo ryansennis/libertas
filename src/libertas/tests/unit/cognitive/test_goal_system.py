@@ -1,9 +1,10 @@
 """Tests for Goal and GoalSystem classes."""
 
 import pytest
-from libertas.cognitive import Goal, GoalSystem
+from libertas.cognitive import Goal, GoalSystem, GoalStatus
 
 
+@pytest.mark.unit
 class TestGoal:
     """Test Goal dataclass."""
 
@@ -25,7 +26,7 @@ class TestGoal:
         assert goal.target_value == 1000.0
         assert goal.priority == 0.8
         assert goal.progress == 0.0
-        assert goal.status == "active"
+        assert goal.status == GoalStatus.NOT_STARTED
 
     def test_goal_defaults(self):
         """Test goal default values."""
@@ -40,7 +41,7 @@ class TestGoal:
         assert goal.deadline_step is None
         assert goal.priority == 0.5
         assert goal.progress == 0.0
-        assert goal.status == "active"
+        assert goal.status == GoalStatus.NOT_STARTED
         assert goal.created_step == 0
 
     def test_evaluate_progress_with_target(self):
@@ -83,7 +84,7 @@ class TestGoal:
 
     def test_goal_status_values(self):
         """Test different goal status values."""
-        statuses = ["active", "achieved", "abandoned"]
+        statuses = [GoalStatus.NOT_STARTED, GoalStatus.IN_PROGRESS, GoalStatus.COMPLETED, GoalStatus.ABANDONED]
 
         for status in statuses:
             goal = Goal(
@@ -95,6 +96,7 @@ class TestGoal:
             assert goal.status == status
 
 
+@pytest.mark.unit
 class TestGoalSystem:
     """Test GoalSystem class."""
 
@@ -103,7 +105,7 @@ class TestGoalSystem:
         system = GoalSystem()
 
         assert system.active_goals == []
-        assert system.achieved_goals == []
+        assert system.completed_goals == []
         assert system.abandoned_goals == []
 
     def test_add_goal(self):
@@ -143,9 +145,9 @@ class TestGoalSystem:
         system.update_progress("goal_1", 0.5)
 
         assert system.active_goals[0].progress == 0.5
-        assert system.active_goals[0].status == "active"
+        assert system.active_goals[0].status == GoalStatus.IN_PROGRESS
         assert len(system.active_goals) == 1
-        assert len(system.achieved_goals) == 0
+        assert len(system.completed_goals) == 0
 
     def test_update_progress_achieve_goal(self):
         """Test achieving a goal through progress update."""
@@ -156,9 +158,9 @@ class TestGoalSystem:
         system.update_progress("goal_1", 1.0)
 
         assert len(system.active_goals) == 0
-        assert len(system.achieved_goals) == 1
-        assert system.achieved_goals[0].status == "achieved"
-        assert system.achieved_goals[0].progress == 1.0
+        assert len(system.completed_goals) == 1
+        assert system.completed_goals[0].status == GoalStatus.COMPLETED
+        assert system.completed_goals[0].progress == 1.0
 
     def test_update_progress_nonexistent_goal(self):
         """Test updating progress for nonexistent goal."""
@@ -181,7 +183,8 @@ class TestGoalSystem:
 
         assert len(system.active_goals) == 0
         assert len(system.abandoned_goals) == 1
-        assert system.abandoned_goals[0].status == "abandoned: deadline_passed"
+        assert system.abandoned_goals[0].status == GoalStatus.ABANDONED
+        assert system.abandoned_goals[0].abandon_reason == "deadline_passed"
 
     def test_abandon_nonexistent_goal(self):
         """Test abandoning nonexistent goal."""
@@ -236,7 +239,7 @@ class TestGoalSystem:
         # Add goal
         system.add_goal(goal)
         assert len(system.active_goals) == 1
-        assert len(system.achieved_goals) == 0
+        assert len(system.completed_goals) == 0
 
         # Update progress
         system.update_progress("goal_1", 0.5)
@@ -245,7 +248,7 @@ class TestGoalSystem:
         # Achieve goal
         system.update_progress("goal_1", 1.0)
         assert len(system.active_goals) == 0
-        assert len(system.achieved_goals) == 1
+        assert len(system.completed_goals) == 1
 
     def test_multiple_goal_management(self):
         """Test managing multiple goals simultaneously."""
@@ -264,7 +267,7 @@ class TestGoalSystem:
         # Achieve one
         system.update_progress("goal_0", 1.0)
         assert len(system.active_goals) == 2
-        assert len(system.achieved_goals) == 1
+        assert len(system.completed_goals) == 1
 
         # Abandon one
         system.abandon_goal("goal_1", "changed_priorities")
@@ -273,3 +276,206 @@ class TestGoalSystem:
 
         # One remains active
         assert system.active_goals[0].goal_id == "goal_2"
+
+    def test_evaluate_progress_with_none_current_value(self):
+        """Test evaluate_progress when current_value is None."""
+        goal = Goal(
+            goal_id="goal_1",
+            goal_type="economic",
+            description="Test goal",
+            target_value=1000.0,
+            progress=0.3
+        )
+
+        # When current_value is None, should return existing progress
+        assert goal.evaluate_progress(None) == 0.3
+
+    def test_evaluate_progress_with_zero_current_value(self):
+        """Test evaluate_progress when current_value is 0 (falsy but not None)."""
+        goal = Goal(
+            goal_id="goal_1",
+            goal_type="economic",
+            description="Test goal",
+            target_value=1000.0
+        )
+
+        # When current_value is 0, should calculate 0/1000 = 0.0
+        assert goal.evaluate_progress(0.0) == 0.0
+        assert goal.evaluate_progress(0) == 0.0
+
+    def test_evaluate_progress_zero_target(self):
+        """Test evaluate_progress when target_value is 0."""
+        goal = Goal(
+            goal_id="goal_1",
+            goal_type="learning",
+            description="Test goal",
+            target_value=0.0,  # Falsy target value
+            progress=0.6
+        )
+
+        # Should return existing progress since target is falsy
+        assert goal.evaluate_progress(100.0) == 0.6
+
+    def test_evaluate_progress_no_target_with_current_value(self):
+        """Test evaluate_progress when no target but current_value provided."""
+        goal = Goal(
+            goal_id="goal_1",
+            goal_type="learning",
+            description="Learn skill",
+            target_value=None,
+            progress=0.5
+        )
+
+        # Without target_value, should return existing progress
+        assert goal.evaluate_progress(100.0) == 0.5
+        assert goal.evaluate_progress(0.0) == 0.5
+
+    def test_goal_with_deadline_and_created_step(self):
+        """Test goal with deadline_step and created_step."""
+        goal = Goal(
+            goal_id="goal_1",
+            goal_type="economic",
+            description="Time-limited goal",
+            deadline_step=100,
+            created_step=10
+        )
+
+        assert goal.deadline_step == 100
+        assert goal.created_step == 10
+
+    def test_update_progress_over_one(self):
+        """Test that progress over 1.0 achieves goal."""
+        system = GoalSystem()
+        goal = Goal(goal_id="goal_1", goal_type="economic", description="Test")
+        system.add_goal(goal)
+
+        # Progress >= 1.0 should achieve goal
+        system.update_progress("goal_1", 1.5)
+
+        assert len(system.active_goals) == 0
+        assert len(system.completed_goals) == 1
+        assert system.completed_goals[0].progress == 1.5
+
+    def test_abandon_with_detailed_reason(self):
+        """Test abandoning goal with detailed reason string."""
+        system = GoalSystem()
+        goal = Goal(goal_id="goal_1", goal_type="governance", description="Test")
+        system.add_goal(goal)
+
+        reason = "deadline_passed_on_step_150"
+        system.abandon_goal("goal_1", reason)
+
+        assert len(system.abandoned_goals) == 1
+        assert system.abandoned_goals[0].status == GoalStatus.ABANDONED
+        assert system.abandoned_goals[0].abandon_reason == reason
+
+    def test_get_active_goals_with_equal_priority(self):
+        """Test sorting goals with equal priorities."""
+        system = GoalSystem()
+        goals = [
+            Goal(goal_id="goal_1", goal_type="economic", description="A", priority=0.5),
+            Goal(goal_id="goal_2", goal_type="social", description="B", priority=0.5),
+            Goal(goal_id="goal_3", goal_type="governance", description="C", priority=0.5)
+        ]
+
+        for goal in goals:
+            system.add_goal(goal)
+
+        sorted_goals = system.get_active_goals_by_priority()
+
+        # All should have same priority
+        assert len(sorted_goals) == 3
+        assert all(g.priority == 0.5 for g in sorted_goals)
+
+    def test_goal_type_variations(self):
+        """Test all expected goal types."""
+        types = ["economic", "social", "governance", "learning"]
+
+        for goal_type in types:
+            goal = Goal(
+                goal_id=f"goal_{goal_type}",
+                goal_type=goal_type,
+                description=f"Test {goal_type}",
+                priority=0.7
+            )
+            assert goal.goal_type == goal_type
+            assert goal.priority == 0.7
+
+    def test_goal_starts_not_started(self):
+        """Test that goals start with NOT_STARTED status."""
+        goal = Goal(
+            goal_id="goal_1",
+            goal_type="economic",
+            description="Test goal"
+        )
+        assert goal.status == GoalStatus.NOT_STARTED
+
+    def test_add_goal_transitions_to_in_progress(self):
+        """Test that adding a goal transitions it to IN_PROGRESS."""
+        system = GoalSystem()
+        goal = Goal(
+            goal_id="goal_1",
+            goal_type="economic",
+            description="Test goal"
+        )
+        assert goal.status == GoalStatus.NOT_STARTED
+
+        system.add_goal(goal)
+
+        assert goal.status == GoalStatus.IN_PROGRESS
+
+    def test_revive_abandoned_goal(self):
+        """Test that we can revive an abandoned goal."""
+        system = GoalSystem()
+        goal = Goal(goal_id="goal_1", goal_type="economic", description="Test goal")
+        system.add_goal(goal)
+
+        # Abandon the goal
+        system.abandon_goal("goal_1", "changed_priorities")
+        assert len(system.active_goals) == 0
+        assert len(system.abandoned_goals) == 1
+
+        # Revive it
+        result = system.revive_goal("goal_1")
+
+        assert result is True
+        assert len(system.active_goals) == 1
+        assert len(system.abandoned_goals) == 0
+        assert system.active_goals[0].status == GoalStatus.IN_PROGRESS
+        assert system.active_goals[0].abandon_reason is None
+
+    def test_revive_nonexistent_goal(self):
+        """Test reviving a goal that doesn't exist."""
+        system = GoalSystem()
+
+        result = system.revive_goal("nonexistent")
+
+        assert result is False
+        assert len(system.active_goals) == 0
+        assert len(system.abandoned_goals) == 0
+
+    def test_abandon_reason_stored_separately(self):
+        """Test that abandon reason is stored in its own field."""
+        system = GoalSystem()
+        goal = Goal(goal_id="goal_1", goal_type="economic", description="Test goal")
+        system.add_goal(goal)
+
+        system.abandon_goal("goal_1", "deadline_passed")
+
+        assert system.abandoned_goals[0].status == GoalStatus.ABANDONED
+        assert system.abandoned_goals[0].abandon_reason == "deadline_passed"
+        # Status should be just the enum, not include the reason
+        assert system.abandoned_goals[0].status != "abandoned: deadline_passed"
+
+    def test_revive_clears_abandon_reason(self):
+        """Test that reviving clears the abandon reason."""
+        system = GoalSystem()
+        goal = Goal(goal_id="goal_1", goal_type="economic", description="Test goal")
+        system.add_goal(goal)
+
+        system.abandon_goal("goal_1", "lost_interest")
+        assert system.abandoned_goals[0].abandon_reason == "lost_interest"
+
+        system.revive_goal("goal_1")
+
+        assert system.active_goals[0].abandon_reason is None

@@ -6,7 +6,7 @@ from libertas.organization import Federation, Worker
 from libertas.organization.pod import PodConfig
 from libertas.organization.worker import WorkerConfig
 from libertas.economy import Resource
-from libertas.cognitive import SemanticMemory, Goal, GoalSystem
+from libertas.cognitive import SemanticMemory, Goal, GoalSystem, GoalStatus
 
 LLM_MODEL = "ollama/functiongemma"
 
@@ -36,6 +36,7 @@ def worker(federation):
     return pod.get_worker_by_index(0)
 
 
+@pytest.mark.unit
 class TestWorkerLearning:
     """Test worker learning from experience."""
 
@@ -180,13 +181,14 @@ class TestWorkerLearning:
         assert "governance" in insights
 
 
+@pytest.mark.unit
 class TestWorkerGoals:
     """Test worker goal management."""
 
     def test_initial_goals_empty(self, worker):
         """Test that worker starts with no goals."""
         assert len(worker.goals.active_goals) == 0
-        assert len(worker.goals.achieved_goals) == 0
+        assert len(worker.goals.completed_goals) == 0
         assert len(worker.goals.abandoned_goals) == 0
 
     def test_generate_initial_goals_economic_right(self, worker):
@@ -240,7 +242,7 @@ class TestWorkerGoals:
 
         # Progress should be updated
         assert worker.goals.active_goals[0].progress == 0.5
-        assert worker.goals.active_goals[0].status == "active"
+        assert worker.goals.active_goals[0].status == GoalStatus.IN_PROGRESS
 
     def test_evaluate_goals_achieve(self, worker):
         """Test achieving a goal."""
@@ -258,8 +260,8 @@ class TestWorkerGoals:
 
         # Goal should be achieved and moved
         assert len(worker.goals.active_goals) == 0
-        assert len(worker.goals.achieved_goals) == 1
-        assert worker.goals.achieved_goals[0].status == "achieved"
+        assert len(worker.goals.completed_goals) == 1
+        assert worker.goals.completed_goals[0].status == GoalStatus.COMPLETED
 
     def test_evaluate_goals_deadline(self, worker, federation):
         """Test abandoning goals past deadline."""
@@ -280,7 +282,7 @@ class TestWorkerGoals:
         # Goal should be abandoned
         assert len(worker.goals.active_goals) == 0
         assert len(worker.goals.abandoned_goals) == 1
-        assert "deadline_passed" in worker.goals.abandoned_goals[0].status
+        assert worker.goals.abandoned_goals[0].abandon_reason == "deadline_passed"
 
     def test_get_goal_metric_value_currency(self, worker):
         """Test getting currency metric value."""
@@ -384,6 +386,7 @@ class TestWorkerGoals:
         assert "50%" in formatted or "0.5" in formatted  # Progress
 
 
+@pytest.mark.unit
 class TestWorkerCognitiveLoopIntegration:
     """Test integration of learning and goals into cognitive loop."""
 
