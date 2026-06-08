@@ -17,7 +17,11 @@ class ResourceTag(Enum):
 class Resource:
     """
     A resource in the economy. Can be raw materials, components, finished goods, or tools.
-    
+
+    DEPRECATED: This class uses boolean flags (is_tool) instead of proper types.
+    New code should use Material, Tool, Equipment, or Consumable from the resources module.
+
+    This class is maintained for backward compatibility with existing tests and legacy code.
     Resources can be invented at runtime by workers, making the economy open-ended.
     """
     

@@ -13,15 +13,19 @@ except ImportError:
 class Inventory:
     """Inventory of resources for a worker or pod.
 
-    Currently maintains both old (quantities/instances) and new (materials/tools/equipment/consumables)
-    tracking systems during migration period.
+    DEPRECATED: This class maintains the old system for backward compatibility.
+    New code should use WorkerInventory, PodInventory, or FederationInventory
+    from the resources module.
+
+    The old quantities/instances fields are maintained for legacy tests.
+    The new materials/tools/equipment/consumables fields are the primary storage.
     """
 
-    # OLD SYSTEM (will be removed in Phase 6)
+    # OLD SYSTEM (deprecated - kept for backward compatibility)
     quantities: Dict[str, float] = field(default_factory=dict)
     instances: Dict[str, List[Resource]] = field(default_factory=dict)
 
-    # NEW SYSTEM (parallel tracking)
+    # NEW SYSTEM (primary storage)
     materials: Dict[str, 'Material'] = field(default_factory=dict) if NEW_SYSTEM_AVAILABLE else field(default_factory=dict)
     tools: Dict[str, 'Tool'] = field(default_factory=dict) if NEW_SYSTEM_AVAILABLE else field(default_factory=dict)
     equipment: Dict[str, 'Equipment'] = field(default_factory=dict) if NEW_SYSTEM_AVAILABLE else field(default_factory=dict)
