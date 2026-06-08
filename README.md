@@ -187,11 +187,13 @@ See [scripts/README.md](scripts/README.md) for detailed testing documentation.
 - Resource trading between pods
 - Market statistics and price history
 
-**Resources** (`libertas.economy.resource`):
-- Bulk resources (wood, metal, food)
-- Tools with durability and skill requirements
-- Resource invention system
-- Registry for global resource definitions
+**Resources** (`libertas.resources`):
+- **Materials**: Fungible bulk resources (wood, metal, wheat)
+- **Tools**: Worker-held tools with durability (hammer, saw)
+- **Equipment**: Pod-level machinery (lathe, CNC, forge)
+- **Consumables**: Single-use items for worker needs (food, water)
+- Type-safe inventories for workers, pods, and federations
+- Resource invention system for emergent economies
 
 ### Organizational Structure
 
@@ -268,11 +270,19 @@ compare_governance_models(results)
 ```
 libertas/
 ├── src/libertas/
+│   ├── resources/            # Resource system (NEW Phase 3)
+│   │   ├── resource.py       # ResourceInfo component
+│   │   ├── material.py       # Fungible materials (wood, metal)
+│   │   ├── tool.py           # Worker tools with durability
+│   │   ├── equipment.py      # Pod machinery (lathe, forge)
+│   │   ├── consumable.py     # Worker needs items (food, water)
+│   │   ├── inventory.py      # WorkerInventory, PodInventory, FederationInventory
+│   │   └── registry.py       # ResourceRegistry
 │   ├── economy/              # Economic system
-│   │   ├── inventory.py      # Resource storage
+│   │   ├── inventory.py      # Legacy inventory (backward compat)
 │   │   ├── market.py         # Trading system
 │   │   ├── production.py     # Jobs and recipes
-│   │   └── resource.py       # Resources and tools
+│   │   └── resource.py       # Legacy resource (backward compat)
 │   ├── governance/           # Democratic systems
 │   │   ├── constitution.py   # Constitutional framework
 │   │   └── voting.py         # Voting and motions
@@ -281,16 +291,23 @@ libertas/
 │   │   ├── pod.py            # Worker cooperatives
 │   │   └── worker.py         # LLM-powered agents
 │   ├── cognitive/            # Agent cognitive architecture
-│   │   └── __init__.py       # PersonalityTraits, Background, MoodState
+│   │   ├── personality.py    # PersonalityTraits, Background
+│   │   ├── mood.py           # MoodState
+│   │   ├── memory.py         # Episodic and semantic memory
+│   │   ├── goals.py          # Goal system with enum states
+│   │   └── needs.py          # Worker needs (NEW Phase 3)
 │   └── tools/                # LLM tools for agents
-│       ├── economic_tools.py # Production, trading, invention
-│       └── governance_tools.py # Voting, motions, constitution
+│       ├── economic_tools.py    # Production, trading, invention
+│       ├── governance_tools.py  # Voting, motions, constitution
+│       ├── organization_tools.py # Pod/federation interaction
+│       ├── cognitive_tools.py   # Goals, memory, mood
+│       └── needs_tools.py       # Needs checking and purchasing (NEW)
 ├── scripts/                  # Utility scripts
 │   ├── test.py              # Unified test runner
 │   └── setup_ollama.py      # LLM setup
 └── tests/                   # Test suite
-    ├── unit/                # Fast component tests
-    ├── integration/         # Interaction tests
+    ├── unit/                # Fast component tests (678 tests)
+    ├── integration/         # Interaction tests (38 tests)
     └── e2e/                 # Full simulation tests
 ```
 
@@ -350,14 +367,24 @@ See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup and
 - ✅ Semantic memory
 - ✅ Explicit goal tracking
 
-**Phase 3: Advanced Economics**
+**Phase 3: Resources & Worker Needs** ✅ **COMPLETE**
+- ✅ Type-safe resource system (Material, Tool, Equipment, Consumable)
+- ✅ Composition-based design (ResourceInfo component)
+- ✅ Collection-based inventories (WorkerInventory, PodInventory, FederationInventory)
+- ✅ Worker physiological needs (hunger, thirst, rest, recreation, housing)
+- ✅ LLM-driven purchasing decisions (NeedsTools)
+- ✅ Economic pressure and emergent behavior
+- ✅ Comprehensive test coverage (716 tests, 88% coverage)
+
+**Phase 4: Advanced Economics** ⏳
 - Time-dependent tasks
 - Banking and loans
 - Contracts and negotiations
-- Resource invention
+- Resource invention (enhanced)
 - Supply chains
+- Worker expenses and budgeting
 
-**Phase 4: Experimentation**
+**Phase 5: Experimentation** ⏳
 - Batch experiment framework
 - Metrics collection
 - Statistical analysis
