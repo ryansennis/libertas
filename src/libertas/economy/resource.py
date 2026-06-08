@@ -127,20 +127,70 @@ class Resource:
         )
 
 class ResourceRegistry:
-    """Registry of all known resource types in the economy."""
-    
+    """Registry of all known resource types in the economy.
+
+    During migration: supports BOTH old Resource and new Material/Tool/Equipment/Consumable.
+    """
+
     def __init__(self):
         self._resources: Dict[str, Resource] = {}
         self._invention_history: List[Dict] = []
-    
+
+        # NEW SYSTEM: parallel tracking (Phase 2)
+        try:
+            from ..resources import Material, Tool, Equipment, Consumable
+            self._materials: Dict[str, 'Material'] = {}
+            self._tools: Dict[str, 'Tool'] = {}
+            self._equipment: Dict[str, 'Equipment'] = {}
+            self._consumables: Dict[str, 'Consumable'] = {}
+            self._new_system_available = True
+        except ImportError:
+            self._new_system_available = False
+
     def register(self, resource: Resource) -> None:
-        """Register a resource type."""
+        """Register an old-style resource type."""
         if resource.name not in self._resources:
             self._resources[resource.name] = resource
+
+    def register_material(self, material: 'Material') -> None:
+        """Register a new-style Material."""
+        if self._new_system_available and material.info.name not in self._materials:
+            self._materials[material.info.name] = material
+
+    def register_tool(self, tool: 'Tool') -> None:
+        """Register a new-style Tool."""
+        if self._new_system_available and tool.info.name not in self._tools:
+            self._tools[tool.info.name] = tool
+
+    def register_equipment(self, equipment: 'Equipment') -> None:
+        """Register a new-style Equipment."""
+        if self._new_system_available and equipment.info.name not in self._equipment:
+            self._equipment[equipment.info.name] = equipment
+
+    def register_consumable(self, consumable: 'Consumable') -> None:
+        """Register a new-style Consumable."""
+        if self._new_system_available and consumable.info.name not in self._consumables:
+            self._consumables[consumable.info.name] = consumable
     
     def get(self, name: str) -> Optional[Resource]:
-        """Get a resource by name."""
+        """Get a resource by name.
+
+        During migration: returns OLD Resource type for compatibility.
+        Use get_material(), get_tool(), etc. for new types.
+        """
         return self._resources.get(name)
+
+    def get_material(self, name: str) -> Optional['Material']:
+        """Get a Material by name (new system)."""
+        if self._new_system_available:
+            return self._materials.get(name)
+        return None
+
+    def get_tool(self, name: str) -> Optional['Tool']:
+        """Get a Tool by name (new system)."""
+        if self._new_system_available:
+            return self._tools.get(name)
+        return None
 
     
     def invent(self, name: str, inventor_id: str, step: int,
