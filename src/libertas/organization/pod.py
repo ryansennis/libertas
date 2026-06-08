@@ -1,5 +1,6 @@
 from __future__ import annotations
-from ..economy import Inventory, ProductionJob
+from ..economy import ProductionJob
+from ..resources import PodInventory
 from ..governance import Constitution
 from .worker import Worker, WorkerConfig
 from dataclasses import dataclass
@@ -101,7 +102,7 @@ class Pod(AgentSet[Worker]):
 
         self._cell = Cell(coordinate=coordinate)
 
-        self.inventory = Inventory(capacity=None)
+        self.inventory = PodInventory(capacity=None)
         self.production_queue: List[ProductionJob] = []
         self.active_jobs: List[ProductionJob] = []
         self.completed_jobs: List[ProductionJob] = []
@@ -115,7 +116,7 @@ class Pod(AgentSet[Worker]):
         if pod_config.initial_tools:
             for tool_name in pod_config.initial_tools:
                 tool = federation.resource_registry.get(tool_name)
-                if tool and tool.is_tool:
+                if tool:
                     self.inventory.add(tool, 1)
 
         # Create graph AFTER workers are in AgentSet

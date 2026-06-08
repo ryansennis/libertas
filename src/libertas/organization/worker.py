@@ -11,7 +11,8 @@ import importlib
 if TYPE_CHECKING:
     from .pod import Pod
     from .federation import Federation
-    from ..economy import ProductionJob, Resource
+    from ..economy import ProductionJob
+    from ..resources import Tool
 
 from ..cognitive import PersonalityTraits, Background, MoodState
 
@@ -133,17 +134,11 @@ class Worker(LLMAgent):
         
         # Skills (skill_name -> proficiency level 0-10)
         self.skills: Dict[str, float] = worker_config.initial_skills or {}
-        
-        # Personal tool inventory (OLD SYSTEM - will be replaced)
-        self.tools: Dict[str, List['Resource']] = {}  # tool_name -> list of tool instances
-        self.equipped_tool: Optional[str] = None
 
-        # NEW SYSTEM: Worker inventory (parallel tracking during migration)
-        try:
-            from ..resources import WorkerInventory
-            self.inventory: WorkerInventory = WorkerInventory(capacity=10.0)
-        except ImportError:
-            self.inventory = None
+        # Personal tool inventory
+        from ..resources import WorkerInventory
+        self.inventory: WorkerInventory = WorkerInventory(capacity=10.0)
+        self.equipped_tool: Optional[str] = None
         
         # Personal currency (for market transactions)
         self.currency: float = worker_config.initial_currency
@@ -157,9 +152,9 @@ class Worker(LLMAgent):
         if worker_config.initial_tools:
             federation = self._federation
             for tool_name in worker_config.initial_tools:
-                tool_template = federation.get_resource(tool_name)
-                if tool_template and tool_template.is_tool:
-                    self._add_tool(tool_template)
+                tool = federation.resource_registry.get_tool(tool_name)
+                if tool:
+                    self.inventory.add(tool)
         
         # Cognitive attributes
         self.personality = worker_config.personality or PersonalityTraits()
@@ -330,58 +325,42 @@ class Worker(LLMAgent):
     def federation(self, value: 'Federation'):
         self._federation = value
     
-    def _add_tool(self, tool_template: 'Resource') -> None:
-        """Add a tool to worker's inventory."""
-        from ..economy.resource import Resource
-        
-        # Create a new instance of the tool
-        tool = Resource(
-            name=tool_template.name,
-            base_value=tool_template.base_value,
-            is_tool=True,
-            durability=tool_template.durability,
-            required_skill=tool_template.required_skill,
-            enables_recipes=tool_template.enables_recipes.copy() if tool_template.enables_recipes else []
-        )
-        
-        if tool.name not in self.tools:
-            self.tools[tool.name] = []
-        self.tools[tool.name].append(tool)
-    
     def has_tool(self, tool_name: str) -> bool:
         """Check if worker has a specific tool."""
-        return tool_name in self.tools and len(self.tools[tool_name]) > 0
-    
+        return self.inventory.count_tools(tool_name) > 0
+
     def equip_tool(self, tool_name: str) -> bool:
         """Equip a tool from inventory."""
         if self.has_tool(tool_name):
             self.equipped_tool = tool_name
             return True
         return False
-    
+
     def unequip_tool(self) -> None:
         """Unequip current tool."""
         self.equipped_tool = None
-    
+
     def use_equipped_tool(self) -> bool:
         """Use the equipped tool, degrading it. Returns True if still usable."""
         if not self.equipped_tool:
             return False
-        
-        if self.equipped_tool not in self.tools:
+
+        # Get a tool instance from inventory
+        tool = self.inventory.get_tool(self.equipped_tool)
+        if not tool:
+            self.equipped_tool = None
             return False
-        
-        tool = self.tools[self.equipped_tool][0]
-        success = tool.use_tool()
-        
+
+        # Use the tool
+        success = tool.use()
+
+        # If broken, don't return it to inventory
         if tool.is_broken():
-            # Remove broken tool
-            self.tools[self.equipped_tool].pop(0)
-            if not self.tools[self.equipped_tool]:
-                del self.tools[self.equipped_tool]
-                self.equipped_tool = None
+            self.equipped_tool = None
             return False
-        
+
+        # Return tool to inventory
+        self.inventory.add(tool)
         return success
     
     # Skill Management

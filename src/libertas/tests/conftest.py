@@ -4,8 +4,8 @@
 import pytest
 from mesa_llm.reasoning.cot import CoTReasoning
 
-from libertas.economy import Resource, Recipe, ProductionStep, StepType, ResourceRegistry, RecipeRegistry
-from libertas.resources import ResourceInfo, Material, Tool
+from libertas.economy import Recipe, ProductionStep, StepType, RecipeRegistry
+from libertas.resources import ResourceInfo, Material, Tool, ResourceRegistry
 from libertas.organization import WorkerConfig, PodConfig, Federation
 
 
@@ -30,18 +30,6 @@ def resource_registry():
         required_skill="crafting"
     )
     registry.register_tool(hammer)
-
-    # Also register OLD-style for backward compatibility during migration
-    registry.register(Resource(name="wood", base_value=10.0))
-    registry.register(Resource(name="metal", base_value=20.0))
-    registry.register(Resource(name="plank", base_value=15.0))
-    registry.register(Resource(
-        name="hammer",
-        base_value=50.0,
-        is_tool=True,
-        durability=100.0,
-        required_skill="crafting"
-    ))
 
     return registry
 

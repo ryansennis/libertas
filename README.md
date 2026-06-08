@@ -306,8 +306,8 @@ libertas/
 │   ├── test.py              # Unified test runner
 │   └── setup_ollama.py      # LLM setup
 └── tests/                   # Test suite
-    ├── unit/                # Fast component tests (678 tests)
-    ├── integration/         # Interaction tests (38 tests)
+    ├── unit/                # Fast component tests
+    ├── integration/         # Interaction tests
     └── e2e/                 # Full simulation tests
 ```
 
@@ -374,7 +374,6 @@ See [.github/CONTRIBUTING.md](.github/CONTRIBUTING.md) for development setup and
 - ✅ Worker physiological needs (hunger, thirst, rest, recreation, housing)
 - ✅ LLM-driven purchasing decisions (NeedsTools)
 - ✅ Economic pressure and emergent behavior
-- ✅ Comprehensive test coverage (716 tests, 88% coverage)
 
 **Phase 4: Advanced Economics** ⏳
 - Time-dependent tasks

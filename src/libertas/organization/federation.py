@@ -6,7 +6,11 @@ import mesa
 import networkx as nx
 import numpy as np
 
-from ..economy import ResourceRegistry, Resource, RecipeRegistry, Recipe, Market
+from ..economy import RecipeRegistry, Recipe, Market
+from ..resources import ResourceRegistry, Material, Tool, Equipment, Consumable
+from typing import Union
+
+ResourceType = Union[Material, Tool, Equipment, Consumable]
 from ..governance import Constitution, GovernanceEngine
 
 SeedLike = int | np.integer | Sequence[int] | np.random.SeedSequence
@@ -120,7 +124,7 @@ class Federation(mesa.Model, MutableSet[Pod]):
                 pod.coordinate = tuple(position)
     
     # Economic Methods
-    def register_new_resource(self, resource: Resource) -> bool:
+    def register_new_resource(self, resource: ResourceType) -> bool:
         registry = self.resource_registry
         if registry is not None:
             registry.register(resource)
@@ -141,7 +145,7 @@ class Federation(mesa.Model, MutableSet[Pod]):
             category=category
         )
     
-    def get_resource(self, name: str) -> Optional[Resource]:
+    def get_resource(self, name: str) -> Optional[ResourceType]:
         return self.resource_registry.get(name)
     
     def get_recipe(self, name: str) -> Optional[Recipe]:
