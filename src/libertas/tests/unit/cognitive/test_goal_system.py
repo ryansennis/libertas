@@ -273,3 +273,126 @@ class TestGoalSystem:
 
         # One remains active
         assert system.active_goals[0].goal_id == "goal_2"
+
+    def test_evaluate_progress_with_none_current_value(self):
+        """Test evaluate_progress when current_value is None."""
+        goal = Goal(
+            goal_id="goal_1",
+            goal_type="economic",
+            description="Test goal",
+            target_value=1000.0,
+            progress=0.3
+        )
+
+        # When current_value is None, should return existing progress
+        assert goal.evaluate_progress(None) == 0.3
+
+    def test_evaluate_progress_with_zero_current_value(self):
+        """Test evaluate_progress when current_value is 0 (falsy but not None)."""
+        goal = Goal(
+            goal_id="goal_1",
+            goal_type="economic",
+            description="Test goal",
+            target_value=1000.0
+        )
+
+        # When current_value is 0, should calculate 0/1000 = 0.0
+        assert goal.evaluate_progress(0.0) == 0.0
+        assert goal.evaluate_progress(0) == 0.0
+
+    def test_evaluate_progress_zero_target(self):
+        """Test evaluate_progress when target_value is 0."""
+        goal = Goal(
+            goal_id="goal_1",
+            goal_type="learning",
+            description="Test goal",
+            target_value=0.0,  # Falsy target value
+            progress=0.6
+        )
+
+        # Should return existing progress since target is falsy
+        assert goal.evaluate_progress(100.0) == 0.6
+
+    def test_evaluate_progress_no_target_with_current_value(self):
+        """Test evaluate_progress when no target but current_value provided."""
+        goal = Goal(
+            goal_id="goal_1",
+            goal_type="learning",
+            description="Learn skill",
+            target_value=None,
+            progress=0.5
+        )
+
+        # Without target_value, should return existing progress
+        assert goal.evaluate_progress(100.0) == 0.5
+        assert goal.evaluate_progress(0.0) == 0.5
+
+    def test_goal_with_deadline_and_created_step(self):
+        """Test goal with deadline_step and created_step."""
+        goal = Goal(
+            goal_id="goal_1",
+            goal_type="economic",
+            description="Time-limited goal",
+            deadline_step=100,
+            created_step=10
+        )
+
+        assert goal.deadline_step == 100
+        assert goal.created_step == 10
+
+    def test_update_progress_over_one(self):
+        """Test that progress over 1.0 achieves goal."""
+        system = GoalSystem()
+        goal = Goal(goal_id="goal_1", goal_type="economic", description="Test")
+        system.add_goal(goal)
+
+        # Progress >= 1.0 should achieve goal
+        system.update_progress("goal_1", 1.5)
+
+        assert len(system.active_goals) == 0
+        assert len(system.achieved_goals) == 1
+        assert system.achieved_goals[0].progress == 1.5
+
+    def test_abandon_with_detailed_reason(self):
+        """Test abandoning goal with detailed reason string."""
+        system = GoalSystem()
+        goal = Goal(goal_id="goal_1", goal_type="governance", description="Test")
+        system.add_goal(goal)
+
+        reason = "deadline_passed_on_step_150"
+        system.abandon_goal("goal_1", reason)
+
+        assert len(system.abandoned_goals) == 1
+        assert system.abandoned_goals[0].status == f"abandoned: {reason}"
+
+    def test_get_active_goals_with_equal_priority(self):
+        """Test sorting goals with equal priorities."""
+        system = GoalSystem()
+        goals = [
+            Goal(goal_id="goal_1", goal_type="economic", description="A", priority=0.5),
+            Goal(goal_id="goal_2", goal_type="social", description="B", priority=0.5),
+            Goal(goal_id="goal_3", goal_type="governance", description="C", priority=0.5)
+        ]
+
+        for goal in goals:
+            system.add_goal(goal)
+
+        sorted_goals = system.get_active_goals_by_priority()
+
+        # All should have same priority
+        assert len(sorted_goals) == 3
+        assert all(g.priority == 0.5 for g in sorted_goals)
+
+    def test_goal_type_variations(self):
+        """Test all expected goal types."""
+        types = ["economic", "social", "governance", "learning"]
+
+        for goal_type in types:
+            goal = Goal(
+                goal_id=f"goal_{goal_type}",
+                goal_type=goal_type,
+                description=f"Test {goal_type}",
+                priority=0.7
+            )
+            assert goal.goal_type == goal_type
+            assert goal.priority == 0.7
