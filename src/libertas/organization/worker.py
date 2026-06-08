@@ -134,9 +134,16 @@ class Worker(LLMAgent):
         # Skills (skill_name -> proficiency level 0-10)
         self.skills: Dict[str, float] = worker_config.initial_skills or {}
         
-        # Personal tool inventory
+        # Personal tool inventory (OLD SYSTEM - will be replaced)
         self.tools: Dict[str, List['Resource']] = {}  # tool_name -> list of tool instances
         self.equipped_tool: Optional[str] = None
+
+        # NEW SYSTEM: Worker inventory (parallel tracking during migration)
+        try:
+            from ..resources import WorkerInventory
+            self.inventory: WorkerInventory = WorkerInventory(capacity=10.0)
+        except ImportError:
+            self.inventory = None
         
         # Personal currency (for market transactions)
         self.currency: float = worker_config.initial_currency

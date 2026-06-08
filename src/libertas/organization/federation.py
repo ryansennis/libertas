@@ -41,6 +41,13 @@ class Federation(mesa.Model, MutableSet[Pod]):
         self.constitution = constitution or Constitution.create_default_federation_constitution()
         self.governance = GovernanceEngine()
 
+        # NEW SYSTEM: Federation-level shared inventory (parallel tracking)
+        try:
+            from ..resources import FederationInventory
+            self.shared_inventory: FederationInventory = FederationInventory(capacity=None)
+        except ImportError:
+            self.shared_inventory = None
+
         # Create pods with temporary coordinates
         pod_instances: List[Pod] = []
         self._pod_map: Dict[str, Pod] = {}  # Map name to pod
