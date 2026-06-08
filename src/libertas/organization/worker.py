@@ -173,9 +173,19 @@ class Worker(LLMAgent):
         from ..tools.governance_tools import GovernanceTools
         self.governance_tools = GovernanceTools(self)
 
+        # Initialize organization tools
+        from ..tools.organization_tools import OrganizationTools
+        self.organization_tools = OrganizationTools(self)
+
+        # Initialize cognitive tools
+        from ..tools.cognitive_tools import CognitiveTools
+        self.cognitive_tools = CognitiveTools(self)
+
         # Register tools with LLMAgent's tool manager
         self._register_economic_tools()
         self._register_governance_tools()
+        self._register_organization_tools()
+        self._register_cognitive_tools()
 
         # Generate initial goals based on personality
         # Note: This will only work after federation is set
@@ -208,7 +218,35 @@ class Worker(LLMAgent):
             tool_func = getattr(self.governance_tools, tool_name, None)
             if tool_func:
                 self.tool_manager.register(tool_func)
-    
+
+    def _register_organization_tools(self):
+        """Register organization tools with the LLM agent's tool manager."""
+        from ..tools.organization_tools import get_organization_tool_definitions
+
+        # Get tool definitions
+        tool_defs = get_organization_tool_definitions()
+
+        # Register each tool with the tool manager
+        for tool_def in tool_defs:
+            tool_name = tool_def['function']['name']
+            tool_func = getattr(self.organization_tools, tool_name, None)
+            if tool_func:
+                self.tool_manager.register(tool_func)
+
+    def _register_cognitive_tools(self):
+        """Register cognitive tools with the LLM agent's tool manager."""
+        from ..tools.cognitive_tools import get_cognitive_tool_definitions
+
+        # Get tool definitions
+        tool_defs = get_cognitive_tool_definitions()
+
+        # Register each tool with the tool manager
+        for tool_def in tool_defs:
+            tool_name = tool_def['function']['name']
+            tool_func = getattr(self.cognitive_tools, tool_name, None)
+            if tool_func:
+                self.tool_manager.register(tool_func)
+
     def __hash__(self) -> int:
         """Make Worker hashable based on its name."""
         return hash(self.name)
