@@ -167,10 +167,11 @@ class Worker(LLMAgent):
         self.mood = MoodState()
 
         # Memory systems
-        from ..cognitive import SemanticMemory, GoalSystem
+        from ..cognitive import SemanticMemory, GoalSystem, WorkerNeeds
         self.episodic_memory: List[Dict] = []  # Recent experiences (observations + mood)
         self.semantic_memory = SemanticMemory()  # Learned facts and patterns
         self.goals = GoalSystem()  # Active, achieved, and abandoned goals
+        self.needs = WorkerNeeds()  # Physiological and lifestyle needs (Phase 5)
 
         # Initialize economic tools
         from ..tools.economic_tools import EconomicTools
@@ -188,11 +189,16 @@ class Worker(LLMAgent):
         from ..tools.cognitive_tools import CognitiveTools
         self.cognitive_tools = CognitiveTools(self)
 
+        # Initialize needs tools (Phase 5)
+        from ..tools.needs_tools import NeedsTools
+        self.needs_tools = NeedsTools(self)
+
         # Register tools with LLMAgent's tool manager
         self._register_economic_tools()
         self._register_governance_tools()
         self._register_organization_tools()
         self._register_cognitive_tools()
+        self._register_needs_tools()
 
         # Generate initial goals based on personality
         # Note: This will only work after federation is set
@@ -251,6 +257,20 @@ class Worker(LLMAgent):
         for tool_def in tool_defs:
             tool_name = tool_def['function']['name']
             tool_func = getattr(self.cognitive_tools, tool_name, None)
+            if tool_func:
+                self.tool_manager.register(tool_func)
+
+    def _register_needs_tools(self):
+        """Register needs tools with the LLM agent's tool manager."""
+        from ..tools.needs_tools import get_needs_tool_definitions
+
+        # Get tool definitions
+        tool_defs = get_needs_tool_definitions()
+
+        # Register each tool with the tool manager
+        for tool_def in tool_defs:
+            tool_name = tool_def['function']['name']
+            tool_func = getattr(self.needs_tools, tool_name, None)
             if tool_func:
                 self.tool_manager.register(tool_func)
 
@@ -532,13 +552,26 @@ class Worker(LLMAgent):
         Returns:
             Dict with observations, reasoning, and actions
         """
-        # 1. Gather observations
+        # 0. Degrade needs and affect mood (Phase 5)
+        self.needs.degrade_needs()
+        self.needs.affect_mood(self.mood)
+
+        # 1. Gather observations (including needs state)
         observations = {
             "local_workers": self._observe_local_workers(),
             "pod_state": self._observe_pod_state(),
             "market_state": self._observe_market(),
             "active_motions": self._observe_active_votes(),
-            "my_permissions": self._check_permissions()
+            "my_permissions": self._check_permissions(),
+            "my_needs": {
+                "hunger": self.needs.hunger,
+                "thirst": self.needs.thirst,
+                "rest": self.needs.rest,
+                "recreation": self.needs.recreation,
+                "housing_satisfaction": self.needs.housing_satisfaction,
+                "summary": self.needs.get_needs_summary(),
+                "critical": self.needs.get_critical_needs()
+            }
         }
 
         # 2. Update memory and mood

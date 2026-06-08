@@ -4,6 +4,7 @@ from .personality import PersonalityTraits, Background
 from .mood import MoodState
 from .memory import SemanticMemory
 from .goals import Goal, GoalSystem, GoalStatus
+from .needs import WorkerNeeds
 
 __all__ = [
     "PersonalityTraits",
@@ -13,4 +14,5 @@ __all__ = [
     "Goal",
     "GoalSystem",
     "GoalStatus",
+    "WorkerNeeds",
 ]
