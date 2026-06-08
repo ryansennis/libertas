@@ -2,17 +2,16 @@
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
-from .resource import ResourceInfo
+from .resource import Resource, ResourceTag
 
 
 @dataclass
-class Tool:
+class Tool(Resource):
     """
     Worker-held tool with durability (hammer, saw, wrench).
     Portable, used in recipes, degrades with use.
     Each instance is unique and tracked separately.
     """
-    info: ResourceInfo  # Composition
     durability: int = 100
     max_durability: int = 100
     required_skill: Optional[str] = None
@@ -41,28 +40,53 @@ class Tool:
         self.durability = min(self.max_durability, self.durability + amount)
         return cost
 
-    def get_value(self, market_multiplier: float = 1.0) -> float:
-        """Value scales with durability."""
-        durability_factor = self.durability / self.max_durability
-        return round(self.info.base_value * durability_factor * market_multiplier, 2)
+    def get_buy_price(self, market_multiplier: float = 1.0) -> float:
+        """
+        Price to buy tool from market.
+        New tools sell at base_value (includes material + labor costs).
+        Used tools depreciate linearly with durability.
+        """
+        durability_factor = self.durability / self.max_durability if self.durability else 1.0
+        return round(self.base_value * durability_factor * market_multiplier, 2)
+
+    def get_sell_price(self, market_multiplier: float = 1.0) -> float:
+        """
+        Price to sell tool to market.
+        Market spread (75%) + durability depreciation.
+        Floor at scrap value (20% of production cost for materials).
+        """
+        buy_price = self.get_buy_price(market_multiplier)
+        spread = 0.75  # Market takes 25% spread
+        sell_price = buy_price * spread
+
+        # Floor: scrap value (can salvage materials)
+        scrap_value = self.production_cost * 0.2
+        return round(max(sell_price, scrap_value), 2)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
-        return {
-            'type': 'tool',
-            'info': self.info.to_dict(),
-            'durability': self.durability,
-            'max_durability': self.max_durability,
-            'required_skill': self.required_skill,
-            'enables_recipes': self.enables_recipes.copy(),
-            'repair_cost': self.repair_cost
-        }
+        result = self._base_to_dict()
+        result['type'] = 'tool'
+        result['durability'] = self.durability
+        result['max_durability'] = self.max_durability
+        result['required_skill'] = self.required_skill
+        result['enables_recipes'] = self.enables_recipes.copy()
+        result['repair_cost'] = self.repair_cost
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Tool':
         """Deserialize from dictionary."""
         return cls(
-            info=ResourceInfo.from_dict(data['info']),
+            name=data['name'],
+            resource_id=data.get('resource_id'),
+            base_value=data.get('base_value', 1.0),
+            production_cost=data.get('production_cost', 0.0),
+            weight=data.get('weight', 1.0),
+            tags=[ResourceTag(t) for t in data.get('tags', [])],
+            properties=data.get('properties', {}).copy(),
+            invented_by=data.get('invented_by'),
+            invention_step=data.get('invention_step'),
             durability=data.get('durability', 100),
             max_durability=data.get('max_durability', 100),
             required_skill=data.get('required_skill'),

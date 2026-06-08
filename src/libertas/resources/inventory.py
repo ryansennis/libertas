@@ -5,16 +5,14 @@ inventories are collection-like structures for resources.
 """
 
 from abc import ABC, abstractmethod
-from typing import Union, Optional, List, Dict, Any, Iterator
+from typing import Optional, List, Dict, Any, Iterator
 from itertools import chain
 
+from .resource import Resource
 from .material import Material
 from .tool import Tool
 from .equipment import Equipment
 from .consumable import Consumable
-
-# Union type for all resource types
-ResourceType = Union[Material, Tool, Equipment, Consumable]
 
 
 class BaseInventory(ABC):
@@ -27,7 +25,7 @@ class BaseInventory(ABC):
         self.capacity = capacity
 
     @abstractmethod
-    def add(self, resource: ResourceType, quantity: float = 1.0) -> bool:
+    def add(self, resource: Resource, quantity: float = 1.0) -> bool:
         """Add a resource to inventory."""
         pass
 
@@ -42,7 +40,7 @@ class BaseInventory(ABC):
         pass
 
     @abstractmethod
-    def __iter__(self) -> Iterator[ResourceType]:
+    def __iter__(self) -> Iterator[Resource]:
         """Iterate over all resources."""
         pass
 
@@ -73,21 +71,21 @@ class WorkerInventory(BaseInventory):
         super().__init__(capacity)
         self._tools: Dict[str, Tool] = {}  # resource_id → Tool
 
-    def add(self, resource: ResourceType, quantity: float = 1.0) -> bool:
+    def add(self, resource: Resource, quantity: float = 1.0) -> bool:
         """Add a resource (only tools allowed for workers)."""
         if not isinstance(resource, Tool):
             return False  # Workers can only hold tools
 
-        if self.capacity and self.get_total_weight() + resource.info.weight > self.capacity:
+        if self.capacity and self.get_total_weight() + resource.weight > self.capacity:
             return False
 
-        self._tools[resource.info.resource_id] = resource
+        self._tools[resource.resource_id] = resource
         return True
 
     def remove(self, resource_name: str, quantity: float = 1.0) -> bool:
         """Remove a tool by name."""
         for tool_id, tool in list(self._tools.items()):
-            if tool.info.name == resource_name:
+            if tool.name == resource_name:
                 del self._tools[tool_id]
                 return True
         return False
@@ -95,17 +93,17 @@ class WorkerInventory(BaseInventory):
     def get_tool(self, tool_name: str) -> Optional[Tool]:
         """Get first available tool by name (removes from inventory)."""
         for tool_id, tool in list(self._tools.items()):
-            if tool.info.name == tool_name and not tool.is_broken():
+            if tool.name == tool_name and not tool.is_broken():
                 del self._tools[tool_id]
                 return tool
         return None
 
     def count_tools(self, tool_name: str) -> int:
         """Count how many tools of a given name we have."""
-        return sum(1 for t in self._tools.values() if t.info.name == tool_name)
+        return sum(1 for t in self._tools.values() if t.name == tool_name)
 
     def get_total_weight(self) -> float:
-        return sum(t.info.weight for t in self._tools.values())
+        return sum(t.weight for t in self._tools.values())
 
     def __iter__(self) -> Iterator[Tool]:
         """Iterate over tools."""
@@ -146,7 +144,7 @@ class PodInventory(BaseInventory):
         self._equipment: Dict[str, Equipment] = {}  # resource_id → Equipment (non-fungible)
         self._consumables: Dict[str, Consumable] = {}  # name → Consumable (stackable)
 
-    def add(self, resource: ResourceType, quantity: float = 1.0) -> bool:
+    def add(self, resource: Resource, quantity: float = 1.0) -> bool:
         """Add a resource, with type-specific handling."""
         if self.capacity:
             added_weight = self._calculate_added_weight(resource, quantity)
@@ -154,22 +152,22 @@ class PodInventory(BaseInventory):
                 return False
 
         if isinstance(resource, Material):
-            if resource.info.name in self._materials:
-                self._materials[resource.info.name].merge(resource)
+            if resource.name in self._materials:
+                self._materials[resource.name].merge(resource)
             else:
-                self._materials[resource.info.name] = resource
+                self._materials[resource.name] = resource
 
         elif isinstance(resource, Tool):
-            self._tools[resource.info.resource_id] = resource
+            self._tools[resource.resource_id] = resource
 
         elif isinstance(resource, Equipment):
-            self._equipment[resource.info.resource_id] = resource
+            self._equipment[resource.resource_id] = resource
 
         elif isinstance(resource, Consumable):
-            if resource.info.name in self._consumables:
-                self._consumables[resource.info.name].quantity += quantity
+            if resource.name in self._consumables:
+                self._consumables[resource.name].quantity += quantity
             else:
-                self._consumables[resource.info.name] = resource
+                self._consumables[resource.name] = resource
 
         else:
             return False
@@ -230,7 +228,7 @@ class PodInventory(BaseInventory):
         consumable_weight = sum(c.info.weight * c.quantity for c in self._consumables.values())
         return material_weight + tool_weight + equipment_weight + consumable_weight
 
-    def __iter__(self) -> Iterator[ResourceType]:
+    def __iter__(self) -> Iterator[Resource]:
         """Iterate over all resources."""
         return chain(
             self._materials.values(),
@@ -244,12 +242,12 @@ class PodInventory(BaseInventory):
         return (len(self._materials) + len(self._tools) +
                 len(self._equipment) + len(self._consumables))
 
-    def _calculate_added_weight(self, resource: ResourceType, quantity: float) -> float:
+    def _calculate_added_weight(self, resource: Resource, quantity: float) -> float:
         """Calculate weight that would be added."""
         if isinstance(resource, (Material, Consumable)):
-            return resource.info.weight * quantity
+            return resource.weight * quantity
         else:
-            return resource.info.weight
+            return resource.weight
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dict."""
@@ -297,22 +295,22 @@ class FederationInventory(BaseInventory):
         self._equipment: Dict[str, Equipment] = {}
         self._consumables: Dict[str, Consumable] = {}
 
-    def add(self, resource: ResourceType, quantity: float = 1.0) -> bool:
+    def add(self, resource: Resource, quantity: float = 1.0) -> bool:
         """Add any resource type to federation pool."""
         if isinstance(resource, Material):
-            if resource.info.name in self._materials:
-                self._materials[resource.info.name].merge(resource)
+            if resource.name in self._materials:
+                self._materials[resource.name].merge(resource)
             else:
-                self._materials[resource.info.name] = resource
+                self._materials[resource.name] = resource
         elif isinstance(resource, Tool):
-            self._tools[resource.info.resource_id] = resource
+            self._tools[resource.resource_id] = resource
         elif isinstance(resource, Equipment):
-            self._equipment[resource.info.resource_id] = resource
+            self._equipment[resource.resource_id] = resource
         elif isinstance(resource, Consumable):
-            if resource.info.name in self._consumables:
-                self._consumables[resource.info.name].quantity += quantity
+            if resource.name in self._consumables:
+                self._consumables[resource.name].quantity += quantity
             else:
-                self._consumables[resource.info.name] = resource
+                self._consumables[resource.name] = resource
         else:
             return False
         return True
@@ -396,7 +394,7 @@ class FederationInventory(BaseInventory):
         consumable_weight = sum(c.info.weight * c.quantity for c in self._consumables.values())
         return material_weight + tool_weight + equipment_weight + consumable_weight
 
-    def __iter__(self) -> Iterator[ResourceType]:
+    def __iter__(self) -> Iterator[Resource]:
         """Iterate over all resources in federation pool."""
         return chain(
             self._materials.values(),

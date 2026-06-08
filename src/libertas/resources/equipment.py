@@ -1,18 +1,17 @@
-"""Equipment class - pod-level machinery and large tools."""
+"""Equipment class - pod-level machinery."""
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
-from .resource import ResourceInfo
+from .resource import Resource, ResourceTag
 
 
 @dataclass
-class Equipment:
+class Equipment(Resource):
     """
     Pod-level equipment/machinery (lathe, CNC machine, forge, loom).
     Too large/expensive for workers to carry. Shared by pod.
-    Requires maintenance and can be used by multiple workers.
+    Requires periodic maintenance.
     """
-    info: ResourceInfo  # Composition
     durability: int = 1000
     max_durability: int = 1000
     required_skill: Optional[str] = None
@@ -27,10 +26,6 @@ class Equipment:
         self.durability = max(0, self.durability - 1)
         return self.durability > 0
 
-    def is_broken(self) -> bool:
-        """Check if equipment is broken."""
-        return self.durability <= 0
-
     def needs_maintenance(self, current_step: int) -> bool:
         """Check if equipment needs maintenance."""
         return (current_step - self.last_maintenance) >= self.maintenance_interval
@@ -41,32 +36,56 @@ class Equipment:
         self.last_maintenance = current_step
         return self.maintenance_cost
 
-    def get_value(self, market_multiplier: float = 1.0) -> float:
-        """Value scales with durability and capacity."""
+    def get_buy_price(self, market_multiplier: float = 1.0) -> float:
+        """
+        Price to buy equipment from market.
+        Depreciates with durability. Capacity adds premium.
+        """
         durability_factor = self.durability / self.max_durability
-        capacity_bonus = 1.0 + (self.capacity * 0.2)
-        return round(self.info.base_value * durability_factor * capacity_bonus * market_multiplier, 2)
+        capacity_factor = 1.0 + (self.capacity - 1) * 0.5  # More capacity = higher value
+        return round(self.base_value * durability_factor * capacity_factor * market_multiplier, 2)
+
+    def get_sell_price(self, market_multiplier: float = 1.0) -> float:
+        """
+        Price to sell equipment to market.
+        Heavy depreciation due to maintenance needs and size.
+        Floor at scrap value (30% of production cost - more salvageable than tools).
+        """
+        buy_price = self.get_buy_price(market_multiplier)
+        spread = 0.70  # Equipment has higher spread (30%) due to size/complexity
+        sell_price = buy_price * spread
+
+        # Floor: scrap value
+        scrap_value = self.production_cost * 0.3
+        return round(max(sell_price, scrap_value), 2)
 
     def to_dict(self) -> Dict[str, Any]:
         """Serialize to dictionary."""
-        return {
-            'type': 'equipment',
-            'info': self.info.to_dict(),
-            'durability': self.durability,
-            'max_durability': self.max_durability,
-            'required_skill': self.required_skill,
-            'enables_recipes': self.enables_recipes.copy(),
-            'maintenance_cost': self.maintenance_cost,
-            'maintenance_interval': self.maintenance_interval,
-            'last_maintenance': self.last_maintenance,
-            'capacity': self.capacity
-        }
+        result = self._base_to_dict()
+        result['type'] = 'equipment'
+        result['durability'] = self.durability
+        result['max_durability'] = self.max_durability
+        result['required_skill'] = self.required_skill
+        result['enables_recipes'] = self.enables_recipes.copy()
+        result['maintenance_cost'] = self.maintenance_cost
+        result['maintenance_interval'] = self.maintenance_interval
+        result['last_maintenance'] = self.last_maintenance
+        result['capacity'] = self.capacity
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Equipment':
         """Deserialize from dictionary."""
         return cls(
-            info=ResourceInfo.from_dict(data['info']),
+            name=data['name'],
+            resource_id=data.get('resource_id'),
+            base_value=data.get('base_value', 1.0),
+            production_cost=data.get('production_cost', 0.0),
+            weight=data.get('weight', 1.0),
+            tags=[ResourceTag(t) for t in data.get('tags', [])],
+            properties=data.get('properties', {}).copy(),
+            invented_by=data.get('invented_by'),
+            invention_step=data.get('invention_step'),
             durability=data.get('durability', 1000),
             max_durability=data.get('max_durability', 1000),
             required_skill=data.get('required_skill'),

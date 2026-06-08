@@ -5,7 +5,7 @@ import pytest
 from mesa_llm.reasoning.cot import CoTReasoning
 
 from libertas.economy import Recipe, ProductionStep, StepType, RecipeRegistry
-from libertas.resources import ResourceInfo, Material, Tool, ResourceRegistry
+from libertas.resources import Material, Tool, ResourceRegistry
 from libertas.organization import WorkerConfig, PodConfig, Federation
 
 
@@ -14,18 +14,19 @@ def resource_registry():
     """Create a resource registry with common test resources."""
     registry = ResourceRegistry()
 
-    # Basic materials (using NEW system)
-    wood = Material(info=ResourceInfo(name="wood", base_value=10.0))
-    metal = Material(info=ResourceInfo(name="metal", base_value=20.0))
-    plank = Material(info=ResourceInfo(name="plank", base_value=15.0))
+    # Basic materials (proper inheritance)
+    wood = Material(name="wood", base_value=10.0)
+    metal = Material(name="metal", base_value=20.0)
+    plank = Material(name="plank", base_value=15.0)
 
     registry.register_material(wood)
     registry.register_material(metal)
     registry.register_material(plank)
 
-    # Tools (using NEW system)
+    # Tools (proper inheritance)
     hammer = Tool(
-        info=ResourceInfo(name="hammer", base_value=50.0),
+        name="hammer",
+        base_value=50.0,
         durability=100,
         required_skill="crafting"
     )

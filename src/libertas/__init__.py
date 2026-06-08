@@ -1,21 +1,23 @@
 from .economy import (
-    Recipe,
-    RecipeRegistry,
     ProductionJob,
-    ProductionStep,
     ResourceRegistry,
     ResourceTag,
-    StepType,
     Market,
     MarketOrder,
     MarketPrice
 )
 from .resources import (
+    Recipe,
+    ProductionStep,
+    StepType
+)
+from .resources import (
+    Resource,
     Material,
     Tool,
     Equipment,
     Consumable,
-    ResourceInfo,
+    ResourceTag,
     WorkerInventory,
     PodInventory,
     FederationInventory

@@ -6,11 +6,8 @@ import mesa
 import networkx as nx
 import numpy as np
 
-from ..economy import RecipeRegistry, Recipe, Market
-from ..resources import ResourceRegistry, Material, Tool, Equipment, Consumable
-from typing import Union
-
-ResourceType = Union[Material, Tool, Equipment, Consumable]
+from ..economy import Market
+from ..resources import ResourceRegistry, Resource, Recipe, ProductionStep
 from ..governance import Constitution, GovernanceEngine
 
 SeedLike = int | np.integer | Sequence[int] | np.random.SeedSequence
@@ -24,11 +21,11 @@ class Federation(mesa.Model, MutableSet[Pod]):
         seed: Optional[Union[float, int]] = None,
         rng: Optional[Union[RNGLike, SeedLike]] = None,
         resource_registry: Optional[ResourceRegistry] = None,
-        recipe_registry: Optional[RecipeRegistry] = None,
         market: Optional[Market] = None,
         initialize_market: bool = True,
         constitution: Optional[Constitution] = None,
         enable_cognitive_loop: bool = True,
+        base_labor_rate: float = 0.5,
     ):
         # Call mesa.Model.__init__
         super().__init__(seed=seed, rng=rng)
@@ -37,9 +34,8 @@ class Federation(mesa.Model, MutableSet[Pod]):
         self.steps = 0
         self.enable_cognitive_loop = enable_cognitive_loop
 
-        # Initialize economic registries
-        self.resource_registry = resource_registry or ResourceRegistry()
-        self.recipe_registry = recipe_registry or RecipeRegistry()
+        # Initialize unified registry (resources + recipes)
+        self.resource_registry = resource_registry or ResourceRegistry(base_labor_rate=base_labor_rate)
 
         # Initialize governance
         self.constitution = constitution or Constitution.create_default_federation_constitution()
@@ -124,7 +120,7 @@ class Federation(mesa.Model, MutableSet[Pod]):
                 pod.coordinate = tuple(position)
     
     # Economic Methods
-    def register_new_resource(self, resource: ResourceType) -> bool:
+    def register_new_resource(self, resource: Resource) -> bool:
         registry = self.resource_registry
         if registry is not None:
             registry.register(resource)
@@ -132,11 +128,11 @@ class Federation(mesa.Model, MutableSet[Pod]):
         else:
             return False
     
-    def register_new_recipe(self, name: str, steps: List, 
+    def register_new_recipe(self, name: str, steps: List,
                            inventor_id: str,
                            description: str = "",
                            category: str = "general") -> Recipe:
-        return self.recipe_registry.invent(
+        return self.resource_registry.invent_recipe(
             name=name,
             steps=steps,
             inventor_id=inventor_id,
@@ -144,18 +140,18 @@ class Federation(mesa.Model, MutableSet[Pod]):
             description=description,
             category=category
         )
-    
-    def get_resource(self, name: str) -> Optional[ResourceType]:
+
+    def get_resource(self, name: str) -> Optional[Resource]:
         return self.resource_registry.get(name)
-    
+
     def get_recipe(self, name: str) -> Optional[Recipe]:
-        return self.recipe_registry.get(name)
-    
+        return self.resource_registry.get_recipe_by_name(name)
+
     def list_resources(self) -> List[str]:
         return self.resource_registry.list_resources()
-    
+
     def list_recipes(self) -> List[str]:
-        return self.recipe_registry.list_recipes()
+        return self.resource_registry.list_recipes()
     
     # MutableSet required methods
     def __contains__(self, pod: object) -> bool:
@@ -313,7 +309,7 @@ class Federation(mesa.Model, MutableSet[Pod]):
             'known_resources': self.list_resources(),
             'known_recipes': self.list_recipes(),
             'resource_inventions': len(self.resource_registry.invention_history),
-            'recipe_inventions': len(self.recipe_registry.invention_history)
+            'recipe_inventions': sum(1 for item in self.resource_registry.invention_history if item['type'] == 'recipe')
         }
 
     def step(self) -> None:

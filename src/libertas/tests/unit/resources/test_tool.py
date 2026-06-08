@@ -2,7 +2,7 @@
 
 import unittest
 import pytest
-from libertas.resources import ResourceInfo, Tool
+from libertas.resources import Tool
 
 
 @pytest.mark.unit
@@ -22,7 +22,7 @@ class TestTool(unittest.TestCase):
 
     def test_tool_creation(self):
         """Test creating a tool."""
-        self.assertEqual(self.tool.info.name, "hammer")
+        self.assertEqual(self.tool.name, "hammer")
         self.assertEqual(self.tool.durability, 100)
         self.assertEqual(self.tool.required_skill, "crafting")
 
@@ -101,7 +101,7 @@ class TestTool(unittest.TestCase):
         data = self.tool.to_dict()
         restored = Tool.from_dict(data)
 
-        self.assertEqual(restored.info.name, 'hammer')
+        self.assertEqual(restored.name, 'hammer')
         self.assertEqual(restored.durability, 100)
         self.assertEqual(restored.required_skill, 'crafting')
         self.assertEqual(restored.repair_cost, 10.0)
@@ -109,7 +109,7 @@ class TestTool(unittest.TestCase):
     def test_infinite_durability_tool(self):
         """Test tool with None durability (infinite)."""
         eternal_tool = Tool(
-            info=ResourceInfo(name="eternal_hammer", base_value=100.0),
+            name="eternal_hammer", base_value=100.0,
             durability=None
         )
 
@@ -123,7 +123,7 @@ class TestTool(unittest.TestCase):
     def test_enables_recipes(self):
         """Test tool with enabled recipes."""
         tool = Tool(
-            info=ResourceInfo(name="saw", base_value=40.0),
+            name="saw", base_value=40.0,
             enables_recipes=["cut_wood", "build_frame"]
         )
 
