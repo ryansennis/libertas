@@ -2,34 +2,33 @@
 """Unit tests for Pod production processing."""
 
 import pytest
-import unittest
 from unittest.mock import Mock
 
 from libertas.organization import Pod, PodConfig, Worker, WorkerConfig, Federation
-from libertas.economy import Recipe, ProductionStep, StepType, Resource
+from libertas.resources import Recipe, ProductionStep, StepType, Resource, Material, Tool
 
 
-LLM_MODEL = "ollama/qwen3"
+LLM_MODEL = "ollama/tinyllama"
 
 
 @pytest.mark.unit
-class TestPodProductionProcessing(unittest.TestCase):
+class TestPodProductionProcessing:
     """Test Pod.process_production method."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         self.federation = Federation(pods=[])
         self.federation.steps = 0
 
         # Register resources
-        self.federation.register_new_resource(
-            Resource("wood", "system", base_value=10.0)
+        self.federation.resource_registry.register(
+            Material("wood", "system", base_value=10.0)
         )
-        self.federation.register_new_resource(
-            Resource("plank", "system", base_value=15.0)
+        self.federation.resource_registry.register(
+            Material("plank", "system", base_value=15.0)
         )
-        self.federation.register_new_resource(
-            Resource("hammer", "system", base_value=50.0, is_tool=True, durability=100.0)
+        self.federation.resource_registry.register(
+            Tool("hammer", "system", base_value=50.0, durability=100.0)
         )
 
         # Create workers with skills
@@ -77,35 +76,35 @@ class TestPodProductionProcessing(unittest.TestCase):
     def test_process_production_moves_queue_to_active(self):
         """Test that process_production moves jobs from queue to active."""
         success, job_id = self.pod.start_production("make_plank", batch_size=1)
-        self.assertTrue(success)
-        self.assertEqual(len(self.pod.production_queue), 1)
-        self.assertEqual(len(self.pod.active_jobs), 0)
+        assert success
+        assert len(self.pod.production_queue) == 1
+        assert len(self.pod.active_jobs) == 0
 
         self.pod.process_production(self.federation.steps)
 
-        self.assertEqual(len(self.pod.production_queue), 0)
-        self.assertEqual(len(self.pod.active_jobs), 1)
+        assert len(self.pod.production_queue) == 0
+        assert len(self.pod.active_jobs) == 1
 
     def test_process_production_assigns_worker(self):
         """Test that process_production assigns available worker to job."""
         success, job_id = self.pod.start_production("make_plank", batch_size=1)
-        self.assertTrue(success)
+        assert success
 
         # Get workers
         workers = list(self.pod)
-        self.assertEqual(workers[0].current_job, None)
-        self.assertEqual(workers[1].current_job, None)
+        assert workers[0].current_job == None
+        assert workers[1].current_job == None
 
         self.pod.process_production(self.federation.steps)
 
         # One worker should be assigned
         assigned_workers = [w for w in workers if w.current_job is not None]
-        self.assertEqual(len(assigned_workers), 1)
+        assert len(assigned_workers) == 1
 
     def test_process_production_assigns_skilled_worker(self):
         """Test that process_production prefers workers with required skills."""
         success, job_id = self.pod.start_production("make_plank", batch_size=1)
-        self.assertTrue(success)
+        assert success
 
         self.pod.process_production(self.federation.steps)
 
@@ -113,12 +112,12 @@ class TestPodProductionProcessing(unittest.TestCase):
         # Both meet requirement (2.0), but first available should get it
         workers = list(self.pod)
         assigned = [w for w in workers if w.current_job is not None]
-        self.assertEqual(len(assigned), 1)
+        assert len(assigned) == 1
 
     def test_process_production_completes_job(self):
         """Test that completed jobs are moved to completed list."""
         success, job_id = self.pod.start_production("make_plank", batch_size=1)
-        self.assertTrue(success)
+        assert success
 
         self.pod.process_production(self.federation.steps)
 
@@ -135,16 +134,16 @@ class TestPodProductionProcessing(unittest.TestCase):
         self.pod.process_production(self.federation.steps)
 
         # Job should be moved to completed
-        self.assertEqual(len(self.pod.active_jobs), 0)
-        self.assertEqual(len(self.pod.completed_jobs), 1)
+        assert len(self.pod.active_jobs) == 0
+        assert len(self.pod.completed_jobs) == 1
 
         # Outputs should be added to inventory
-        self.assertEqual(self.pod.inventory.get_quantity("plank"), initial_plank + 2.0)
+        assert self.pod.inventory.get_quantity("plank") == initial_plank + 2.0
 
     def test_process_production_no_available_workers(self):
         """Test process_production when no workers are available."""
         success, job_id = self.pod.start_production("make_plank", batch_size=1)
-        self.assertTrue(success)
+        assert success
 
         # Make all workers unavailable by assigning them to a fake job
         for worker in self.pod:
@@ -153,9 +152,9 @@ class TestPodProductionProcessing(unittest.TestCase):
         self.pod.process_production(self.federation.steps)
 
         # Job should be in active but not assigned
-        self.assertEqual(len(self.pod.active_jobs), 1)
+        assert len(self.pod.active_jobs) == 1
         job = self.pod.active_jobs[0]
-        self.assertIsNone(job.assigned_worker_id)
+        assert job.assigned_worker_id is None
 
     def test_process_production_requires_tool(self):
         """Test that jobs requiring tools assign workers with tools."""
@@ -175,7 +174,7 @@ class TestPodProductionProcessing(unittest.TestCase):
         self.federation.recipe_registry.register(tool_recipe)
 
         success, job_id = self.pod.start_production("hammer_work", batch_size=1)
-        self.assertTrue(success)
+        assert success
 
         self.pod.process_production(self.federation.steps)
 
@@ -183,13 +182,13 @@ class TestPodProductionProcessing(unittest.TestCase):
         workers = list(self.pod)
         assigned = [w for w in workers if w.current_job is not None]
 
-        self.assertEqual(len(assigned), 1)
-        self.assertTrue(assigned[0].has_tool("hammer"))
+        assert len(assigned) == 1
+        assert assigned[0].has_tool("hammer")
 
     def test_process_production_worker_already_assigned(self):
         """Test that already assigned workers aren't reassigned."""
         success, job_id = self.pod.start_production("make_plank", batch_size=1)
-        self.assertTrue(success)
+        assert success
 
         self.pod.process_production(self.federation.steps)
 
@@ -202,7 +201,7 @@ class TestPodProductionProcessing(unittest.TestCase):
         self.pod.process_production(self.federation.steps)
 
         # Same worker should still be assigned
-        self.assertEqual(assigned_worker.current_job, job)
+        assert assigned_worker.current_job == job
 
     def test_process_production_multiple_jobs(self):
         """Test processing multiple jobs simultaneously."""
@@ -210,33 +209,33 @@ class TestPodProductionProcessing(unittest.TestCase):
         success1, job_id1 = self.pod.start_production("make_plank", batch_size=1)
         success2, job_id2 = self.pod.start_production("make_plank", batch_size=1)
 
-        self.assertTrue(success1)
-        self.assertTrue(success2)
-        self.assertEqual(len(self.pod.production_queue), 2)
+        assert success1
+        assert success2
+        assert len(self.pod.production_queue) == 2
 
         self.pod.process_production(self.federation.steps)
 
         # Both jobs should be active
-        self.assertEqual(len(self.pod.production_queue), 0)
-        self.assertEqual(len(self.pod.active_jobs), 2)
+        assert len(self.pod.production_queue) == 0
+        assert len(self.pod.active_jobs) == 2
 
         # Both workers should be assigned
         workers = list(self.pod)
         assigned = [w for w in workers if w.current_job is not None]
-        self.assertEqual(len(assigned), 2)
+        assert len(assigned) == 2
 
 
 @pytest.mark.unit
-class TestPodProductionEdgeCases(unittest.TestCase):
+class TestPodProductionEdgeCases:
     """Test edge cases in production processing."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         self.federation = Federation(pods=[])
         self.federation.steps = 0
 
-        self.federation.register_new_resource(
-            Resource("wood", "system", base_value=10.0)
+        self.federation.resource_registry.register(
+            Material("wood", "system", base_value=10.0)
         )
 
         worker_config = WorkerConfig(
@@ -258,9 +257,9 @@ class TestPodProductionEdgeCases(unittest.TestCase):
         """Test process_production with no jobs."""
         self.pod.process_production(self.federation.steps)
 
-        self.assertEqual(len(self.pod.production_queue), 0)
-        self.assertEqual(len(self.pod.active_jobs), 0)
-        self.assertEqual(len(self.pod.completed_jobs), 0)
+        assert len(self.pod.production_queue) == 0
+        assert len(self.pod.active_jobs) == 0
+        assert len(self.pod.completed_jobs) == 0
 
     def test_process_production_no_workers(self):
         """Test process_production with no workers in pod."""
@@ -288,8 +287,8 @@ class TestPodProductionEdgeCases(unittest.TestCase):
         empty_pod.process_production(self.federation.steps)
 
         # Job should move to active but remain unassigned
-        self.assertEqual(len(empty_pod.active_jobs), 1)
-        self.assertIsNone(empty_pod.active_jobs[0].assigned_worker_id)
+        assert len(empty_pod.active_jobs) == 1
+        assert empty_pod.active_jobs[0].assigned_worker_id is None
 
     def test_process_production_worker_not_found(self):
         """Test process_production when assigned worker is removed."""
@@ -306,7 +305,7 @@ class TestPodProductionEdgeCases(unittest.TestCase):
         self.federation.recipe_registry.register(recipe)
 
         success, job_id = self.pod.start_production("simple", batch_size=1)
-        self.assertTrue(success)
+        assert success
 
         self.pod.process_production(self.federation.steps)
 
@@ -318,7 +317,7 @@ class TestPodProductionEdgeCases(unittest.TestCase):
         self.pod.process_production(self.federation.steps)
 
         # Job should still be active
-        self.assertEqual(len(self.pod.active_jobs), 1)
+        assert len(self.pod.active_jobs) == 1
 
     def test_complete_job_adds_outputs_to_inventory(self):
         """Test that completing job adds outputs to inventory."""
@@ -334,14 +333,14 @@ class TestPodProductionEdgeCases(unittest.TestCase):
             ]
         )
         self.federation.recipe_registry.register(recipe)
-        self.federation.register_new_resource(
-            Resource("plank", "system", base_value=15.0)
+        self.federation.resource_registry.register(
+            Material("plank", "system", base_value=15.0)
         )
 
         initial_plank = self.pod.inventory.get_quantity("plank")
 
         success, job_id = self.pod.start_production("produce_plank", batch_size=2)
-        self.assertTrue(success)
+        assert success
 
         self.pod.process_production(self.federation.steps)
 
@@ -355,23 +354,21 @@ class TestPodProductionEdgeCases(unittest.TestCase):
         self.pod.process_production(self.federation.steps)
 
         # Should have 3.0 * 2 = 6.0 planks added
-        self.assertEqual(
-            self.pod.inventory.get_quantity("plank"),
-            initial_plank + 6.0
-        )
+        assert self.pod.inventory.get_quantity("plank") == initial_plank + 6.0
+        
 
 
 @pytest.mark.unit
-class TestPodStepMethod(unittest.TestCase):
+class TestPodStepMethod:
     """Test Pod.step() method."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         self.federation = Federation(pods=[])
         self.federation.steps = 10
 
-        self.federation.register_new_resource(
-            Resource("wood", "system", base_value=10.0)
+        self.federation.resource_registry.register(
+            Material("wood", "system", base_value=10.0)
         )
 
         worker_config = WorkerConfig(
@@ -403,15 +400,15 @@ class TestPodStepMethod(unittest.TestCase):
         self.federation.recipe_registry.register(recipe)
 
         success, job_id = self.pod.start_production("simple", batch_size=1)
-        self.assertTrue(success)
+        assert success
 
-        self.assertEqual(len(self.pod.production_queue), 1)
+        assert len(self.pod.production_queue) == 1
 
         self.pod.step()
 
         # Job should be moved from queue to active
-        self.assertEqual(len(self.pod.production_queue), 0)
-        self.assertEqual(len(self.pod.active_jobs), 1)
+        assert len(self.pod.production_queue) == 0
+        assert len(self.pod.active_jobs) == 1
 
     def test_step_with_no_federation_steps(self):
         """Test step() when federation doesn't have steps attribute."""
@@ -425,5 +422,3 @@ class TestPodStepMethod(unittest.TestCase):
         pod.step()
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

@@ -4,7 +4,7 @@
 import pytest
 from mesa_llm.reasoning.cot import CoTReasoning
 
-from libertas.economy import Resource, ResourceRegistry, Recipe, RecipeRegistry, ProductionStep, StepType
+from libertas.resources import Resource, ResourceRegistry, Recipe, ProductionStep, StepType, Material, Tool
 from libertas.organization import WorkerConfig, PodConfig, Federation
 
 
@@ -238,5 +238,3 @@ class TestWorkerPodIntegration:
         assert workers[1] in neighbors
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

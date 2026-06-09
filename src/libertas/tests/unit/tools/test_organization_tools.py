@@ -1,26 +1,25 @@
 """Tests for OrganizationTools class."""
 
-import unittest
 import json
 import pytest
 from unittest.mock import Mock, MagicMock
 
 from libertas.tools.organization_tools import OrganizationTools, get_organization_tool_definitions
-from libertas.organization.worker import Worker, WorkerConfig
-from libertas.organization.pod import Pod, PodConfig
+from libertas.organization.worker import WorkerConfig
+from libertas.organization.pod import PodConfig
 from libertas.organization.federation import Federation
 from libertas.cognitive import PersonalityTraits, Background
-from libertas.economy import Resource
+from libertas.resources import Material, Tool
 from mesa_llm.reasoning.cot import CoTReasoning
 
 LLM_MODEL = "ollama/tinyllama"
 
 
 @pytest.mark.unit
-class TestOrganizationTools(unittest.TestCase):
+class TestOrganizationTools:
     """Test OrganizationTools class."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         # Create a federation with two workers in a pod
         worker_configs = [
@@ -53,9 +52,9 @@ class TestOrganizationTools(unittest.TestCase):
         self.federation = Federation(pods=[pod_config], seed=42)
 
         # Register resources
-        self.federation.register_new_resource(Resource("wood", base_value=10.0))
-        self.federation.register_new_resource(Resource("stone", base_value=15.0))
-        self.federation.register_new_resource(Resource("hammer", base_value=50.0, is_tool=True))
+        self.federation.resource_registry.register(Material("wood", base_value=10.0))
+        self.federation.resource_registry.register(Material("stone", base_value=15.0))
+        self.federation.resource_registry.register(Tool("hammer", base_value=50.0))
 
         self.pod = self.federation[0]
         self.alice = [w for w in self.pod if w.name == "Alice"][0]
@@ -65,23 +64,23 @@ class TestOrganizationTools(unittest.TestCase):
 
     def test_initialization(self):
         """Test OrganizationTools initializes correctly."""
-        self.assertEqual(self.tools.worker, self.alice)
+        assert self.tools.worker == self.alice
 
     def test_list_pod_members(self):
         """Test listing pod members."""
         result = self.tools.list_pod_members()
         data = json.loads(result)
 
-        self.assertEqual(data["pod_name"], "TestPod")
-        self.assertEqual(data["total_members"], 2)
-        self.assertEqual(data["other_members"], 1)
-        self.assertEqual(len(data["members"]), 1)
+        assert data["pod_name"] == "TestPod"
+        assert data["total_members"] == 2
+        assert data["other_members"] == 1
+        assert len(data["members"]) == 1
 
         # Should show Bob but not Alice (self)
         member = data["members"][0]
-        self.assertEqual(member["name"], "Bob")
-        self.assertIn("currency", member)
-        self.assertIn("skills", member)
+        assert member["name"] == "Bob"
+        assert "currency" in member
+        assert "skills" in member
 
     def test_list_pod_members_no_pod(self):
         """Test listing members when worker has no pod."""
@@ -89,30 +88,30 @@ class TestOrganizationTools(unittest.TestCase):
         result = self.tools.list_pod_members()
         data = json.loads(result)
 
-        self.assertIn("error", data)
-        self.assertIn("not assigned to a pod", data["error"])
+        assert "error" in data
+        assert "not assigned to a pod" in data["error"]
 
     def test_get_worker_info(self):
         """Test getting detailed worker information."""
         result = self.tools.get_worker_info("Bob")
         data = json.loads(result)
 
-        self.assertEqual(data["name"], "Bob")
-        self.assertEqual(data["currency"], 500.0)
-        self.assertIn("mining", data["skills"])
-        self.assertEqual(data["skills"]["mining"], 4.0)
-        self.assertIn("mood", data)
-        self.assertIn("personality", data)
-        self.assertIn("happiness", data["mood"])
-        self.assertIn("openness", data["personality"])
+        assert data["name"] == "Bob"
+        assert data["currency"] == 500.0
+        assert "mining" in data["skills"]
+        assert data["skills"]["mining"] == 4.0
+        assert "mood" in data
+        assert "personality" in data
+        assert "happiness" in data["mood"]
+        assert "openness" in data["personality"]
 
     def test_get_worker_info_not_found(self):
         """Test getting info for non-existent worker."""
         result = self.tools.get_worker_info("Charlie")
         data = json.loads(result)
 
-        self.assertIn("error", data)
-        self.assertIn("not found", data["error"])
+        assert "error" in data
+        assert "not found" in data["error"]
 
     def test_get_worker_info_no_pod(self):
         """Test getting worker info when not in pod."""
@@ -120,19 +119,19 @@ class TestOrganizationTools(unittest.TestCase):
         result = self.tools.get_worker_info("Bob")
         data = json.loads(result)
 
-        self.assertIn("error", data)
+        assert "error" in data
 
     def test_check_pod_resources(self):
         """Test checking pod resources."""
         result = self.tools.check_pod_resources()
         data = json.loads(result)
 
-        self.assertEqual(data["pod_name"], "TestPod")
-        self.assertIn("inventory", data)
-        self.assertIn("tools", data)
-        self.assertEqual(data["total_workers"], 2)
-        self.assertEqual(data["active_jobs"], 0)
-        self.assertEqual(data["queued_jobs"], 0)
+        assert data["pod_name"] == "TestPod"
+        assert "inventory" in data
+        assert "tools" in data
+        assert data["total_workers"] == 2
+        assert data["active_jobs"] == 0
+        assert data["queued_jobs"] == 0
 
     def test_check_pod_resources_no_pod(self):
         """Test checking resources when not in pod."""
@@ -140,17 +139,17 @@ class TestOrganizationTools(unittest.TestCase):
         result = self.tools.check_pod_resources()
         data = json.loads(result)
 
-        self.assertIn("error", data)
+        assert "error" in data
 
     def test_view_production_queue(self):
         """Test viewing production queue."""
         result = self.tools.view_production_queue()
         data = json.loads(result)
 
-        self.assertEqual(data["pod_name"], "TestPod")
-        self.assertIsInstance(data["active_jobs"], list)
-        self.assertIsInstance(data["queued_jobs"], list)
-        self.assertEqual(data["total_queued"], 0)
+        assert data["pod_name"] == "TestPod"
+        assert isinstance(data["active_jobs"], list)
+        assert isinstance(data["queued_jobs"], list)
+        assert data["total_queued"] == 0
 
     def test_view_production_queue_no_pod(self):
         """Test viewing queue when not in pod."""
@@ -158,7 +157,7 @@ class TestOrganizationTools(unittest.TestCase):
         result = self.tools.view_production_queue()
         data = json.loads(result)
 
-        self.assertIn("error", data)
+        assert "error" in data
 
     def test_request_tool_from_pod(self):
         """Test requesting a tool from pod."""
@@ -170,17 +169,17 @@ class TestOrganizationTools(unittest.TestCase):
         result = self.tools.request_tool_from_pod("hammer")
         data = json.loads(result)
 
-        self.assertTrue(data["success"])
-        self.assertIn("available", data["message"])
+        assert data["success"]
+        assert "available" in data["message"]
 
     def test_request_tool_not_available(self):
         """Test requesting unavailable tool."""
         result = self.tools.request_tool_from_pod("chainsaw")
         data = json.loads(result)
 
-        self.assertFalse(data["success"])
-        self.assertIn("error", data)
-        self.assertIn("not available", data["error"])
+        assert not (data["success"])
+        assert "error" in data
+        assert "not available" in data["error"]
 
     def test_request_tool_no_pod(self):
         """Test requesting tool when not in pod."""
@@ -188,42 +187,42 @@ class TestOrganizationTools(unittest.TestCase):
         result = self.tools.request_tool_from_pod("hammer")
         data = json.loads(result)
 
-        self.assertIn("error", data)
+        assert "error" in data
 
     def test_view_federation_pods(self):
         """Test viewing all federation pods."""
         result = self.tools.view_federation_pods()
         data = json.loads(result)
 
-        self.assertEqual(data["total_pods"], 1)
-        self.assertEqual(len(data["pods"]), 1)
-        self.assertEqual(data["your_pod"], "TestPod")
+        assert data["total_pods"] == 1
+        assert len(data["pods"]) == 1
+        assert data["your_pod"] == "TestPod"
 
         pod_info = data["pods"][0]
-        self.assertEqual(pod_info["name"], "TestPod")
-        self.assertEqual(pod_info["workers"], 2)
-        self.assertEqual(pod_info["active_jobs"], 0)
+        assert pod_info["name"] == "TestPod"
+        assert pod_info["workers"] == 2
+        assert pod_info["active_jobs"] == 0
 
 
 @pytest.mark.unit
-class TestOrganizationToolDefinitions(unittest.TestCase):
+class TestOrganizationToolDefinitions:
     """Test organization tool definitions."""
 
     def test_get_tool_definitions(self):
         """Test getting tool definitions."""
         defs = get_organization_tool_definitions()
 
-        self.assertIsInstance(defs, list)
-        self.assertGreater(len(defs), 0)
+        assert isinstance(defs, list)
+        assert len(defs) > 0
 
         # Check structure
         for tool_def in defs:
-            self.assertIn("type", tool_def)
-            self.assertEqual(tool_def["type"], "function")
-            self.assertIn("function", tool_def)
-            self.assertIn("name", tool_def["function"])
-            self.assertIn("description", tool_def["function"])
-            self.assertIn("parameters", tool_def["function"])
+            assert "type" in tool_def
+            assert tool_def["type"] == "function"
+            assert "function" in tool_def
+            assert "name" in tool_def["function"]
+            assert "description" in tool_def["function"]
+            assert "parameters" in tool_def["function"]
 
     def test_tool_names(self):
         """Test that all expected tools are defined."""
@@ -240,15 +239,15 @@ class TestOrganizationToolDefinitions(unittest.TestCase):
         ]
 
         for expected in expected_tools:
-            self.assertIn(expected, tool_names)
+            assert expected in tool_names
 
     def test_list_pod_members_definition(self):
         """Test list_pod_members tool definition."""
         defs = get_organization_tool_definitions()
         tool = next(d for d in defs if d["function"]["name"] == "list_pod_members")
 
-        self.assertIn("List all workers", tool["function"]["description"])
-        self.assertEqual(tool["function"]["parameters"]["type"], "object")
+        assert "List all workers" in tool["function"]["description"]
+        assert tool["function"]["parameters"]["type"] == "object"
 
     def test_get_worker_info_definition(self):
         """Test get_worker_info tool definition has required parameters."""
@@ -256,9 +255,7 @@ class TestOrganizationToolDefinitions(unittest.TestCase):
         tool = next(d for d in defs if d["function"]["name"] == "get_worker_info")
 
         params = tool["function"]["parameters"]
-        self.assertIn("worker_name", params["properties"])
-        self.assertIn("worker_name", params["required"])
+        assert "worker_name" in params["properties"]
+        assert "worker_name" in params["required"]
 
 
-if __name__ == "__main__":
-    unittest.main()

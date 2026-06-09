@@ -1,5 +1,6 @@
 from __future__ import annotations
-from ..economy import Inventory, ProductionJob
+from ..economy import ProductionJob
+from ..resources import PodInventory
 from ..governance import Constitution
 from .worker import Worker, WorkerConfig
 from dataclasses import dataclass
@@ -101,7 +102,7 @@ class Pod(AgentSet[Worker]):
 
         self._cell = Cell(coordinate=coordinate)
 
-        self.inventory = Inventory(capacity=None)
+        self.inventory = PodInventory(capacity=None)
         self.production_queue: List[ProductionJob] = []
         self.active_jobs: List[ProductionJob] = []
         self.completed_jobs: List[ProductionJob] = []
@@ -115,7 +116,7 @@ class Pod(AgentSet[Worker]):
         if pod_config.initial_tools:
             for tool_name in pod_config.initial_tools:
                 tool = federation.resource_registry.get(tool_name)
-                if tool and tool.is_tool:
+                if tool:
                     self.inventory.add(tool, 1)
 
         # Create graph AFTER workers are in AgentSet
@@ -184,7 +185,14 @@ class Pod(AgentSet[Worker]):
         return True, job.job_id
     
     def _get_available_inputs(self) -> Dict[str, float]:
-        """Get current inventory levels for recipe checking."""
+        """Get current inventory levels for recipe checking.
+
+        During migration: use new system if available, fallback to old.
+        """
+        # Try new system first
+        if hasattr(self.inventory, 'materials') and self.inventory.materials:
+            return {name: mat.quantity for name, mat in self.inventory.materials.items()}
+        # Fallback to old system
         return self.inventory.quantities.copy()
     
     def process_production(self, simulation_step: int):
@@ -238,14 +246,30 @@ class Pod(AgentSet[Worker]):
     
     def get_inventory_summary(self) -> Dict[str, float]:
         """Get summary of current inventory."""
-        return self.inventory.quantities.copy()
+        result = {}
+
+        # Add materials
+        if hasattr(self.inventory, '_materials'):
+            for name, mat in self.inventory._materials.items():
+                result[name] = mat.quantity
+
+        # Add consumables
+        if hasattr(self.inventory, '_consumables'):
+            for name, cons in self.inventory._consumables.items():
+                result[name] = result.get(name, 0) + cons.quantity
+
+        return result
     
     def get_tools_summary(self) -> Dict[str, int]:
         """Get summary of tools in inventory."""
-        return {
-            name: len(tools) 
-            for name, tools in self.inventory.instances.items()
-        }
+        tool_counts = {}
+
+        if hasattr(self.inventory, '_tools'):
+            for tool_id, tool in self.inventory._tools.items():
+                name = tool.name  # Use tool.name directly, not tool.info.name
+                tool_counts[name] = tool_counts.get(name, 0) + 1
+
+        return tool_counts
     
     def transfer_to_pod(self, resource_name: str, quantity: float, 
                        target_pod: 'Pod') -> bool:

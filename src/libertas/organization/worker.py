@@ -11,7 +11,8 @@ import importlib
 if TYPE_CHECKING:
     from .pod import Pod
     from .federation import Federation
-    from ..economy import ProductionJob, Resource
+    from ..economy import ProductionJob
+    from ..resources import Tool
 
 from ..cognitive import PersonalityTraits, Background, MoodState
 
@@ -133,9 +134,10 @@ class Worker(LLMAgent):
         
         # Skills (skill_name -> proficiency level 0-10)
         self.skills: Dict[str, float] = worker_config.initial_skills or {}
-        
+
         # Personal tool inventory
-        self.tools: Dict[str, List['Resource']] = {}  # tool_name -> list of tool instances
+        from ..resources import WorkerInventory
+        self.inventory: WorkerInventory = WorkerInventory(capacity=10.0)
         self.equipped_tool: Optional[str] = None
         
         # Personal currency (for market transactions)
@@ -150,9 +152,9 @@ class Worker(LLMAgent):
         if worker_config.initial_tools:
             federation = self._federation
             for tool_name in worker_config.initial_tools:
-                tool_template = federation.get_resource(tool_name)
-                if tool_template and tool_template.is_tool:
-                    self._add_tool(tool_template)
+                tool = federation.resource_registry.get_tool(tool_name)
+                if tool:
+                    self.inventory.add(tool)
         
         # Cognitive attributes
         self.personality = worker_config.personality or PersonalityTraits()
@@ -160,10 +162,11 @@ class Worker(LLMAgent):
         self.mood = MoodState()
 
         # Memory systems
-        from ..cognitive import SemanticMemory, GoalSystem
+        from ..cognitive import SemanticMemory, GoalSystem, WorkerNeeds
         self.episodic_memory: List[Dict] = []  # Recent experiences (observations + mood)
         self.semantic_memory = SemanticMemory()  # Learned facts and patterns
         self.goals = GoalSystem()  # Active, achieved, and abandoned goals
+        self.needs = WorkerNeeds()  # Physiological and lifestyle needs (Phase 5)
 
         # Initialize economic tools
         from ..tools.economic_tools import EconomicTools
@@ -181,11 +184,16 @@ class Worker(LLMAgent):
         from ..tools.cognitive_tools import CognitiveTools
         self.cognitive_tools = CognitiveTools(self)
 
+        # Initialize needs tools (Phase 5)
+        from ..tools.needs_tools import NeedsTools
+        self.needs_tools = NeedsTools(self)
+
         # Register tools with LLMAgent's tool manager
         self._register_economic_tools()
         self._register_governance_tools()
         self._register_organization_tools()
         self._register_cognitive_tools()
+        self._register_needs_tools()
 
         # Generate initial goals based on personality
         # Note: This will only work after federation is set
@@ -247,6 +255,20 @@ class Worker(LLMAgent):
             if tool_func:
                 self.tool_manager.register(tool_func)
 
+    def _register_needs_tools(self):
+        """Register needs tools with the LLM agent's tool manager."""
+        from ..tools.needs_tools import get_needs_tool_definitions
+
+        # Get tool definitions
+        tool_defs = get_needs_tool_definitions()
+
+        # Register each tool with the tool manager
+        for tool_def in tool_defs:
+            tool_name = tool_def['function']['name']
+            tool_func = getattr(self.needs_tools, tool_name, None)
+            if tool_func:
+                self.tool_manager.register(tool_func)
+
     def __hash__(self) -> int:
         """Make Worker hashable based on its name."""
         return hash(self.name)
@@ -303,58 +325,42 @@ class Worker(LLMAgent):
     def federation(self, value: 'Federation'):
         self._federation = value
     
-    def _add_tool(self, tool_template: 'Resource') -> None:
-        """Add a tool to worker's inventory."""
-        from ..economy.resource import Resource
-        
-        # Create a new instance of the tool
-        tool = Resource(
-            name=tool_template.name,
-            base_value=tool_template.base_value,
-            is_tool=True,
-            durability=tool_template.durability,
-            required_skill=tool_template.required_skill,
-            enables_recipes=tool_template.enables_recipes.copy() if tool_template.enables_recipes else []
-        )
-        
-        if tool.name not in self.tools:
-            self.tools[tool.name] = []
-        self.tools[tool.name].append(tool)
-    
     def has_tool(self, tool_name: str) -> bool:
         """Check if worker has a specific tool."""
-        return tool_name in self.tools and len(self.tools[tool_name]) > 0
-    
+        return self.inventory.count_tools(tool_name) > 0
+
     def equip_tool(self, tool_name: str) -> bool:
         """Equip a tool from inventory."""
         if self.has_tool(tool_name):
             self.equipped_tool = tool_name
             return True
         return False
-    
+
     def unequip_tool(self) -> None:
         """Unequip current tool."""
         self.equipped_tool = None
-    
+
     def use_equipped_tool(self) -> bool:
         """Use the equipped tool, degrading it. Returns True if still usable."""
         if not self.equipped_tool:
             return False
-        
-        if self.equipped_tool not in self.tools:
+
+        # Get a tool instance from inventory
+        tool = self.inventory.get_tool(self.equipped_tool)
+        if not tool:
+            self.equipped_tool = None
             return False
-        
-        tool = self.tools[self.equipped_tool][0]
-        success = tool.use_tool()
-        
+
+        # Use the tool
+        success = tool.use()
+
+        # If broken, don't return it to inventory
         if tool.is_broken():
-            # Remove broken tool
-            self.tools[self.equipped_tool].pop(0)
-            if not self.tools[self.equipped_tool]:
-                del self.tools[self.equipped_tool]
-                self.equipped_tool = None
+            self.equipped_tool = None
             return False
-        
+
+        # Return tool to inventory
+        self.inventory.add(tool)
         return success
     
     # Skill Management
@@ -489,11 +495,17 @@ class Worker(LLMAgent):
     # Status Methods
     def get_status(self) -> Dict[str, Any]:
         """Get worker's current status."""
+        # Build tool summary from inventory
+        tool_summary = {}
+        if hasattr(self.inventory, '_tools'):
+            for tool in self.inventory._tools.values():
+                tool_summary[tool.name] = tool_summary.get(tool.name, 0) + 1
+
         return {
             'name': self.name,
             'skills': self.skills.copy(),
             'equipped_tool': self.equipped_tool,
-            'tools': {name: len(tools) for name, tools in self.tools.items()},
+            'tools': tool_summary,
             'currency': self.currency,
             'current_job': self.current_job.job_id if self.current_job else None,
             'completed_jobs': len(self.completed_jobs),
@@ -502,13 +514,18 @@ class Worker(LLMAgent):
     
     def to_dict(self) -> Dict[str, Any]:
         """Serialize worker state."""
+        # Build tools dict grouped by name
+        tools_by_name = {}
+        if hasattr(self.inventory, '_tools'):
+            for tool in self.inventory._tools.values():
+                if tool.name not in tools_by_name:
+                    tools_by_name[tool.name] = []
+                tools_by_name[tool.name].append(tool.to_dict())
+
         return {
             'name': self.name,
             'skills': self.skills.copy(),
-            'tools': {
-                name: [tool.to_dict() for tool in tools]
-                for name, tools in self.tools.items()
-            },
+            'tools': tools_by_name,
             'equipped_tool': self.equipped_tool,
             'currency': self.currency,
             'completed_jobs': self.completed_jobs.copy(),
@@ -525,13 +542,26 @@ class Worker(LLMAgent):
         Returns:
             Dict with observations, reasoning, and actions
         """
-        # 1. Gather observations
+        # 0. Degrade needs and affect mood (Phase 5)
+        self.needs.degrade_needs()
+        self.needs.affect_mood(self.mood)
+
+        # 1. Gather observations (including needs state)
         observations = {
             "local_workers": self._observe_local_workers(),
             "pod_state": self._observe_pod_state(),
             "market_state": self._observe_market(),
             "active_motions": self._observe_active_votes(),
-            "my_permissions": self._check_permissions()
+            "my_permissions": self._check_permissions(),
+            "my_needs": {
+                "hunger": self.needs.hunger,
+                "thirst": self.needs.thirst,
+                "rest": self.needs.rest,
+                "recreation": self.needs.recreation,
+                "housing_satisfaction": self.needs.housing_satisfaction,
+                "summary": self.needs.get_needs_summary(),
+                "critical": self.needs.get_critical_needs()
+            }
         }
 
         # 2. Update memory and mood
@@ -593,7 +623,7 @@ class Worker(LLMAgent):
             return {"error": "Not in a pod"}
 
         return {
-            "inventory": dict(self.pod.inventory.quantities),
+            "inventory": self.pod.get_inventory_summary(),  # Use method instead of direct access
             "active_jobs": len(self.pod.active_jobs),
             "workers_count": self.pod.num_workers(),
             "available_recipes": self.federation.list_recipes() if self.federation else []
@@ -1144,7 +1174,8 @@ Respond in JSON format:
             if goal.target_metric == "currency":
                 return self.currency
             elif goal.target_metric == "tools":
-                return float(sum(len(tools) for tools in self.tools.values()))
+                # Count tools in inventory
+                return float(len(self.inventory) if hasattr(self, 'inventory') else 0)
 
         elif goal.goal_type == "social":
             if goal.target_metric == "avg_trust":

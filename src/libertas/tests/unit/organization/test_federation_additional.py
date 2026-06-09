@@ -2,27 +2,26 @@
 """Additional unit tests for Federation class to improve coverage."""
 
 import pytest
-import unittest
 from unittest.mock import Mock
 
 from libertas.organization import Federation, Pod, PodConfig, WorkerConfig
-from libertas.economy import Resource, Recipe, ProductionStep, StepType
+from libertas.resources import Resource, Recipe, ProductionStep, StepType, Material
 
 
-LLM_MODEL = "ollama/qwen3"
+LLM_MODEL = "ollama/tinyllama"
 
 
 @pytest.mark.unit
-class TestFederationHelperMethods(unittest.TestCase):
+class TestFederationHelperMethods:
     """Test Federation private helper methods."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         self.federation = Federation(pods=[])
 
         # Register resources
-        self.federation.register_new_resource(
-            Resource("wood", "system", base_value=10.0)
+        self.federation.resource_registry.register(
+            Material("wood", "system", base_value=10.0)
         )
 
         # Create pods with workers
@@ -57,31 +56,31 @@ class TestFederationHelperMethods(unittest.TestCase):
     def test_get_pod_inventory(self):
         """Test _get_pod_inventory helper method."""
         quantity = self.federation._get_pod_inventory("pod1", "wood")
-        self.assertEqual(quantity, 50.0)
+        assert quantity == 50.0
 
     def test_get_pod_inventory_nonexistent_pod(self):
         """Test _get_pod_inventory with nonexistent pod."""
         quantity = self.federation._get_pod_inventory("nonexistent", "wood")
-        self.assertEqual(quantity, 0.0)
+        assert quantity == 0.0
 
     def test_get_pod_inventory_nonexistent_resource(self):
         """Test _get_pod_inventory with nonexistent resource."""
         quantity = self.federation._get_pod_inventory("pod1", "gold")
-        self.assertEqual(quantity, 0.0)
+        assert quantity == 0.0
 
     def test_update_pod_inventory_add(self):
         """Test _update_pod_inventory adding resources."""
         initial = self.pod1.inventory.get_quantity("wood")
         self.federation._update_pod_inventory("pod1", "wood", 20.0)
         final = self.pod1.inventory.get_quantity("wood")
-        self.assertEqual(final, initial + 20.0)
+        assert final == initial + 20.0
 
     def test_update_pod_inventory_remove(self):
         """Test _update_pod_inventory removing resources."""
         initial = self.pod1.inventory.get_quantity("wood")
         self.federation._update_pod_inventory("pod1", "wood", -10.0)
         final = self.pod1.inventory.get_quantity("wood")
-        self.assertEqual(final, initial - 10.0)
+        assert final == initial - 10.0
 
     def test_update_pod_inventory_nonexistent_pod(self):
         """Test _update_pod_inventory with nonexistent pod."""
@@ -96,20 +95,20 @@ class TestFederationHelperMethods(unittest.TestCase):
     def test_find_worker_by_name_exists(self):
         """Test _find_worker_by_name with existing worker."""
         worker = self.federation._find_worker_by_name("worker1")
-        self.assertIsNotNone(worker)
-        self.assertEqual(worker.name, "worker1")
+        assert worker is not None
+        assert worker.name == "worker1"
 
     def test_find_worker_by_name_nonexistent(self):
         """Test _find_worker_by_name with nonexistent worker."""
         worker = self.federation._find_worker_by_name("nonexistent")
-        self.assertIsNone(worker)
+        assert worker is None
 
 
 @pytest.mark.unit
-class TestFederationMarketIntegration(unittest.TestCase):
+class TestFederationMarketIntegration:
     """Test Federation market integration."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         # Create federation with market
         self.federation = Federation(pods=[], initialize_market=True)
@@ -133,10 +132,10 @@ class TestFederationMarketIntegration(unittest.TestCase):
 
 
 @pytest.mark.unit
-class TestFederationPodManagement(unittest.TestCase):
+class TestFederationPodManagement:
     """Test Federation pod management methods."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         self.federation = Federation(pods=[])
 
@@ -146,18 +145,18 @@ class TestFederationPodManagement(unittest.TestCase):
         pod = Pod(self.federation, pod_config, coordinate=(0, 0))
         self.federation.add(pod)
 
-        self.assertIn(pod, self.federation)
+        assert pod in self.federation
 
         self.federation.remove(pod)
 
-        self.assertNotIn(pod, self.federation)
+        assert pod not in self.federation
 
     def test_remove_pod_that_doesnt_exist(self):
         """Test removing a pod that doesn't exist raises KeyError."""
         pod_config = PodConfig(name="pod1", workers=[])
         pod = Pod(self.federation, pod_config, coordinate=(0, 0))
 
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             self.federation.remove(pod)
 
     def test_set_pod_layout_empty_pods(self):
@@ -179,15 +178,15 @@ class TestFederationPodManagement(unittest.TestCase):
         self.federation.set_pod_layout("circular")
 
         # Grid should be created
-        self.assertIsNotNone(self.federation._grid)
-        self.assertIsNotNone(self.federation._pod_graph)
+        assert self.federation._grid is not None
+        assert self.federation._pod_graph is not None
 
 
 @pytest.mark.unit
-class TestFederationGetters(unittest.TestCase):
+class TestFederationGetters:
     """Test Federation getter methods."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         self.federation = Federation(pods=[])
 
@@ -209,7 +208,7 @@ class TestFederationGetters(unittest.TestCase):
         fed.add(pod)
 
         neighbors = fed.get_neighbors(pod)
-        self.assertEqual(neighbors, [])
+        assert neighbors == []
 
     def test_get_neighbors_nonexistent_pod(self):
         """Test get_neighbors with pod not in graph."""
@@ -220,48 +219,48 @@ class TestFederationGetters(unittest.TestCase):
         pod3 = Pod(self.federation, pod_config, coordinate=(2, 0))
 
         neighbors = self.federation.get_neighbors(pod3)
-        self.assertEqual(neighbors, [])
+        assert neighbors == []
 
     def test_get_pod_by_name_exists(self):
         """Test get_pod_by_name with existing pod."""
         pod = self.federation.get_pod_by_name("pod1")
-        self.assertIsNotNone(pod)
-        self.assertEqual(pod.name, "pod1")
+        assert pod is not None
+        assert pod.name == "pod1"
 
     def test_get_pod_by_name_nonexistent(self):
         """Test get_pod_by_name with nonexistent pod."""
         pod = self.federation.get_pod_by_name("nonexistent")
-        self.assertIsNone(pod)
+        assert pod is None
 
     def test_get_pod_by_index_valid(self):
         """Test get_pod_by_index with valid index."""
         pod = self.federation.get_pod_by_index(0)
-        self.assertIsNotNone(pod)
-        self.assertEqual(pod, self.pod1)
+        assert pod is not None
+        assert pod == self.pod1
 
     def test_get_pod_by_index_negative(self):
         """Test get_pod_by_index with negative index."""
         pod = self.federation.get_pod_by_index(-1)
-        self.assertIsNone(pod)
+        assert pod is None
 
     def test_get_pod_by_index_out_of_bounds(self):
         """Test get_pod_by_index with out of bounds index."""
         pod = self.federation.get_pod_by_index(100)
-        self.assertIsNone(pod)
+        assert pod is None
 
 
 @pytest.mark.unit
-class TestFederationEconomicSummary(unittest.TestCase):
+class TestFederationEconomicSummary:
     """Test Federation economic summary methods."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         self.federation = Federation(pods=[], initialize_market=True)
         self.federation.steps = 10
 
         # Register resources
-        self.federation.register_new_resource(
-            Resource("wood", "system", base_value=10.0)
+        self.federation.resource_registry.register(
+            Material("wood", "system", base_value=10.0)
         )
 
         # Create pod with worker and inventory
@@ -285,20 +284,18 @@ class TestFederationEconomicSummary(unittest.TestCase):
         """Test that get_economic_summary returns expected structure."""
         summary = self.federation.get_economic_summary()
 
-        self.assertIn("num_pods", summary)
-        self.assertIn("num_workers", summary)
-        self.assertIn("step", summary)
-        self.assertIn("total_inventory", summary)
+        assert "num_pods" in summary
+        assert "num_workers" in summary
+        assert "step" in summary
+        assert "total_inventory" in summary
 
     def test_get_economic_summary_values(self):
         """Test that get_economic_summary returns correct values."""
         summary = self.federation.get_economic_summary()
 
-        self.assertEqual(summary["num_pods"], 1)
-        self.assertEqual(summary["num_workers"], 1)
-        self.assertEqual(summary["step"], 10)
-        self.assertIn("wood", summary["total_inventory"])
+        assert summary["num_pods"] == 1
+        assert summary["num_workers"] == 1
+        assert summary["step"] == 10
+        assert "wood" in summary["total_inventory"]
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

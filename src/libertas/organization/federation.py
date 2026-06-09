@@ -6,7 +6,8 @@ import mesa
 import networkx as nx
 import numpy as np
 
-from ..economy import ResourceRegistry, Resource, RecipeRegistry, Recipe, Market
+from ..economy import Market
+from ..resources import ResourceRegistry, Resource, Recipe, ProductionStep
 from ..governance import Constitution, GovernanceEngine
 
 SeedLike = int | np.integer | Sequence[int] | np.random.SeedSequence
@@ -20,11 +21,11 @@ class Federation(mesa.Model, MutableSet[Pod]):
         seed: Optional[Union[float, int]] = None,
         rng: Optional[Union[RNGLike, SeedLike]] = None,
         resource_registry: Optional[ResourceRegistry] = None,
-        recipe_registry: Optional[RecipeRegistry] = None,
         market: Optional[Market] = None,
         initialize_market: bool = True,
         constitution: Optional[Constitution] = None,
         enable_cognitive_loop: bool = True,
+        base_labor_rate: float = 0.5,
     ):
         # Call mesa.Model.__init__
         super().__init__(seed=seed, rng=rng)
@@ -33,13 +34,21 @@ class Federation(mesa.Model, MutableSet[Pod]):
         self.steps = 0
         self.enable_cognitive_loop = enable_cognitive_loop
 
-        # Initialize economic registries
-        self.resource_registry = resource_registry or ResourceRegistry()
-        self.recipe_registry = recipe_registry or RecipeRegistry()
+        # Initialize unified registry (resources + recipes)
+        self.resource_registry = resource_registry or ResourceRegistry(base_labor_rate=base_labor_rate)
+        # Alias for backwards compatibility with tests
+        self.recipe_registry = self.resource_registry
 
         # Initialize governance
         self.constitution = constitution or Constitution.create_default_federation_constitution()
         self.governance = GovernanceEngine()
+
+        # NEW SYSTEM: Federation-level shared inventory (parallel tracking)
+        try:
+            from ..resources import FederationInventory
+            self.shared_inventory: FederationInventory = FederationInventory(capacity=None)
+        except ImportError:
+            self.shared_inventory = None
 
         # Create pods with temporary coordinates
         pod_instances: List[Pod] = []
@@ -64,9 +73,10 @@ class Federation(mesa.Model, MutableSet[Pod]):
             self.market = market or Market(random_seed=seed if isinstance(seed, int) else None)
             
             # Register existing resources with market
+            from ..resources import Tool
             for resource_name in self.resource_registry.list_resources():
                 resource = self.resource_registry.get(resource_name)
-                if resource and not resource.is_tool:
+                if resource and not isinstance(resource, Tool):
                     self.market.register_resource(resource_name, resource.base_value)
         else:
             self.market = market
@@ -121,11 +131,11 @@ class Federation(mesa.Model, MutableSet[Pod]):
         else:
             return False
     
-    def register_new_recipe(self, name: str, steps: List, 
+    def register_new_recipe(self, name: str, steps: List,
                            inventor_id: str,
                            description: str = "",
                            category: str = "general") -> Recipe:
-        return self.recipe_registry.invent(
+        return self.resource_registry.invent_recipe(
             name=name,
             steps=steps,
             inventor_id=inventor_id,
@@ -133,18 +143,18 @@ class Federation(mesa.Model, MutableSet[Pod]):
             description=description,
             category=category
         )
-    
+
     def get_resource(self, name: str) -> Optional[Resource]:
         return self.resource_registry.get(name)
-    
+
     def get_recipe(self, name: str) -> Optional[Recipe]:
-        return self.recipe_registry.get(name)
-    
+        return self.resource_registry.get_recipe_by_name(name)
+
     def list_resources(self) -> List[str]:
         return self.resource_registry.list_resources()
-    
+
     def list_recipes(self) -> List[str]:
-        return self.recipe_registry.list_recipes()
+        return self.resource_registry.list_recipes()
     
     # MutableSet required methods
     def __contains__(self, pod: object) -> bool:
@@ -302,7 +312,7 @@ class Federation(mesa.Model, MutableSet[Pod]):
             'known_resources': self.list_resources(),
             'known_recipes': self.list_recipes(),
             'resource_inventions': len(self.resource_registry.invention_history),
-            'recipe_inventions': len(self.recipe_registry.invention_history)
+            'recipe_inventions': sum(1 for item in self.resource_registry.invention_history if item['type'] == 'recipe')
         }
 
     def step(self) -> None:
