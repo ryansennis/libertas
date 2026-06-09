@@ -107,8 +107,12 @@ def basic_federation(basic_pod_config, resource_registry):
     return fed
 
 @pytest.fixture
-def multi_pod_federation(resource_registry, recipe_registry):
-    """Create a federation with multiple pods for integration testing."""
+def multi_pod_federation(resource_registry):
+    """Create a federation with multiple pods for integration testing.
+
+    Use this fixture when testing interactions between multiple pods/workers.
+    For single-worker tests, use simple_worker() instead.
+    """
     worker1_config = WorkerConfig(
         name="worker_001",
         reasoning=CoTReasoning,
@@ -142,3 +146,47 @@ def multi_pod_federation(resource_registry, recipe_registry):
         resource_registry=resource_registry,
         initialize_market=True
     )
+
+
+@pytest.fixture
+def simple_worker(basic_federation):
+    """Return a ready-to-use worker from a basic federation.
+
+    Use this when you need a single worker for testing without
+    navigating through federation/pod structure.
+
+    Returns:
+        Worker: First worker from first pod in federation
+    """
+    pod = basic_federation[0]
+    return list(pod)[0]
+
+
+@pytest.fixture
+def worker_with_tools(resource_registry):
+    """Return a worker with tools equipped and ready.
+
+    Use this for tests that need tool-based production.
+    """
+    worker_config = WorkerConfig(
+        name="tooled_worker",
+        reasoning=Mock,
+        llm_model="ollama/tinyllama",
+        initial_currency=500.0,
+        initial_skills={"crafting": 3.0},
+        initial_tools=["hammer"]
+    )
+    pod_config = PodConfig(
+        name="tool_pod",
+        workers=[worker_config],
+        initial_inventory={"wood": 100.0}
+    )
+    fed = Federation(
+        pods=[pod_config],
+        resource_registry=resource_registry,
+        enable_cognitive_loop=False
+    )
+    pod = fed[0]
+    worker = list(pod)[0]
+    worker.equip_tool("hammer")
+    return worker

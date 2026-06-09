@@ -6,7 +6,7 @@ import unittest
 from unittest.mock import Mock
 
 from libertas.organization import Pod, PodConfig, Worker, WorkerConfig, Federation
-from libertas.economy import Recipe, ProductionStep, StepType, Resource
+from libertas.resources import Recipe, ProductionStep, StepType, Resource
 
 
 LLM_MODEL = "ollama/qwen3"

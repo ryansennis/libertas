@@ -46,7 +46,11 @@ class Tool(Resource):
         New tools sell at base_value (includes material + labor costs).
         Used tools depreciate linearly with durability.
         """
-        durability_factor = self.durability / self.max_durability if self.durability else 1.0
+        if self.durability is None:
+            # Infinite durability
+            durability_factor = 1.0
+        else:
+            durability_factor = self.durability / self.max_durability
         return round(self.base_value * durability_factor * market_multiplier, 2)
 
     def get_sell_price(self, market_multiplier: float = 1.0) -> float:

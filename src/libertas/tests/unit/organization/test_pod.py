@@ -10,7 +10,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from libertas.organization.pod import Pod, PodConfig
 from libertas.organization.worker import Worker, WorkerConfig
 from libertas.organization.federation import Federation
-from libertas.economy import Recipe, ProductionStep, StepType, Resource
+from libertas.resources import Recipe, ProductionStep, StepType, Resource
 
 LLM_MODEL = "ollama/qwen3"
 

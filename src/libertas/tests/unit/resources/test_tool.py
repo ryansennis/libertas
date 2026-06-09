@@ -11,9 +11,10 @@ class TestTool(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.info = ResourceInfo(name="hammer", base_value=50.0, weight=2.0)
         self.tool = Tool(
-            info=self.info,
+            name="hammer",
+            base_value=50.0,
+            weight=2.0,
             durability=100,
             max_durability=100,
             required_skill="crafting",
@@ -74,17 +75,17 @@ class TestTool(unittest.TestCase):
 
     def test_get_value(self):
         """Test tool value scales with durability."""
-        value = self.tool.get_value(market_multiplier=1.0)
+        value = self.tool.get_buy_price(market_multiplier=1.0)
         self.assertEqual(value, 50.0)  # Full durability = full value
 
         self.tool.durability = 50
-        value = self.tool.get_value(market_multiplier=1.0)
+        value = self.tool.get_buy_price(market_multiplier=1.0)
         self.assertEqual(value, 25.0)  # Half durability = half value
 
     def test_get_value_broken(self):
         """Test broken tool has zero value."""
         self.tool.durability = 0
-        value = self.tool.get_value()
+        value = self.tool.get_buy_price()
         self.assertEqual(value, 0.0)
 
     def test_serialization(self):
@@ -94,7 +95,8 @@ class TestTool(unittest.TestCase):
         self.assertEqual(data['type'], 'tool')
         self.assertEqual(data['durability'], 100)
         self.assertEqual(data['required_skill'], 'crafting')
-        self.assertEqual(data['info']['name'], 'hammer')
+        self.assertEqual(data['name'], 'hammer')
+        self.assertEqual(data['base_value'], 50.0)
 
     def test_deserialization(self):
         """Test tool deserialization."""

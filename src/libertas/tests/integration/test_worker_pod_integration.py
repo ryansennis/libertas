@@ -4,7 +4,7 @@
 import pytest
 from mesa_llm.reasoning.cot import CoTReasoning
 
-from libertas.economy import Resource, ResourceRegistry, Recipe, RecipeRegistry, ProductionStep, StepType
+from libertas.resources import Resource, ResourceRegistry, Recipe, ProductionStep, StepType
 from libertas.organization import WorkerConfig, PodConfig, Federation
 
 

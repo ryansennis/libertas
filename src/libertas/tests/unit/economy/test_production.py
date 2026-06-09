@@ -6,13 +6,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from libertas.economy import (
+from libertas.resources import (
     ProductionStep,
     StepType,
-    Recipe,
-    ProductionJob, 
-    RecipeRegistry
+    Recipe
 )
+from libertas.economy import ProductionJob
 
 
 @pytest.mark.unit
