@@ -5,12 +5,10 @@ import pytest
 import unittest
 from unittest.mock import Mock
 
-from libertas.organization import Worker, WorkerConfig, Pod, PodConfig, Federation
-from libertas.economy import Resource, Recipe, ProductionStep, StepType
+from libertas.organization import WorkerConfig, Pod, PodConfig, Federation
+from libertas.resources import Resource, Recipe, ProductionStep, StepType
 from libertas.economy.production import ProductionJob
-
-
-LLM_MODEL = "ollama/qwen3"
+from libertas.tests.conftest import basic_federation, basic_pod_config, basic_worker_config
 
 
 @pytest.mark.unit
@@ -19,27 +17,9 @@ class TestWorkerToolBreakage(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.federation = Federation(pods=[])
-        self.federation.steps = 0
+        self.federation = basic_federation(basic_pod_config(basic_worker_config()))
 
-        # Register tools
-        self.federation.register_new_resource(
-            Resource("hammer", "system", base_value=50.0, is_tool=True, durability=2.0)
-        )
-
-        worker_config = WorkerConfig(
-            name="worker1",
-            reasoning=Mock,
-            llm_model=LLM_MODEL,
-            initial_tools=["hammer"]
-        )
-
-        pod_config = PodConfig(
-            name="test_pod",
-            workers=[worker_config]
-        )
-
-        pod = Pod(self.federation, pod_config, coordinate=(0, 0))
+        pod = self.federation[0]
         self.worker = list(pod)[0]
 
     def test_use_equipped_tool_breaks(self):
@@ -78,27 +58,9 @@ class TestWorkerStepMethod(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.federation = Federation(pods=[])
-        self.federation.steps = 10
+        self.federation = basic_federation(basic_pod_config(basic_worker_config()))
 
-        self.federation.register_new_resource(
-            Resource("wood", "system", base_value=10.0)
-        )
-
-        worker_config = WorkerConfig(
-            name="worker1",
-            reasoning=Mock,
-            llm_model=LLM_MODEL,
-            initial_skills={"crafting": 2.0}
-        )
-
-        pod_config = PodConfig(
-            name="test_pod",
-            workers=[worker_config],
-            initial_inventory={"wood": 100.0}
-        )
-
-        pod = Pod(self.federation, pod_config, coordinate=(0, 0))
+        pod = self.federation[0]
         self.worker = list(pod)[0]
 
     def test_step_with_no_job(self):
@@ -138,21 +100,9 @@ class TestWorkerSkillMethods(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.federation = Federation(pods=[])
+        self.federation = basic_federation(basic_pod_config(basic_worker_config()))
 
-        worker_config = WorkerConfig(
-            name="worker1",
-            reasoning=Mock,
-            llm_model=LLM_MODEL,
-            initial_skills={"crafting": 3.0, "smelting": 2.0}
-        )
-
-        pod_config = PodConfig(
-            name="test_pod",
-            workers=[worker_config]
-        )
-
-        pod = Pod(self.federation, pod_config, coordinate=(0, 0))
+        pod = self.federation[0]
         self.worker = list(pod)[0]
 
     def test_get_skill_level_existing(self):
@@ -177,31 +127,10 @@ class TestWorkerJobCompletion(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.federation = Federation(pods=[])
-        self.federation.steps = 0
+        self.federation = basic_federation(basic_pod_config(basic_worker_config()))
 
-        self.federation.register_new_resource(
-            Resource("wood", "system", base_value=10.0)
-        )
-        self.federation.register_new_resource(
-            Resource("plank", "system", base_value=15.0)
-        )
-
-        worker_config = WorkerConfig(
-            name="worker1",
-            reasoning=Mock,
-            llm_model=LLM_MODEL,
-            initial_skills={"crafting": 3.0}
-        )
-
-        pod_config = PodConfig(
-            name="test_pod",
-            workers=[worker_config],
-            initial_inventory={"wood": 100.0}
-        )
-
-        self.pod = Pod(self.federation, pod_config, coordinate=(0, 0))
-        self.worker = list(self.pod)[0]
+        pod = self.federation[0]
+        self.worker = list(pod)[0]
 
         # Create recipe
         self.recipe = Recipe(
@@ -236,21 +165,9 @@ class TestWorkerCurrency(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.federation = Federation(pods=[])
+        self.federation = basic_federation(basic_pod_config(basic_worker_config()))
 
-        worker_config = WorkerConfig(
-            name="worker1",
-            reasoning=Mock,
-            llm_model=LLM_MODEL,
-            initial_currency=100.0
-        )
-
-        pod_config = PodConfig(
-            name="test_pod",
-            workers=[worker_config]
-        )
-
-        pod = Pod(self.federation, pod_config, coordinate=(0, 0))
+        pod = self.federation[0]
         self.worker = list(pod)[0]
 
     def test_subtract_currency_success(self):

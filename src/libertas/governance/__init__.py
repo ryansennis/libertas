@@ -1,20 +1,25 @@
 """Governance module for constitutional democracy and voting systems."""
 
-from .constitution import Constitution, Article, ConstitutionLevel, AmendmentProposal
+from .constitution import (
+    AmendmentProposal,
+    Article,
+    Constitution,
+    ConstitutionLevel
+)
 from .voting import (
+    GovernanceEngine,
     Motion,
     MotionType,
-    VoteType,
-    GovernanceEngine,
+    VoteType
 )
 
 __all__ = [
-    "Constitution",
-    "Article",
-    "ConstitutionLevel",
     "AmendmentProposal",
+    "Article",
+    "Constitution",
+    "ConstitutionLevel",
+    "GovernanceEngine",
     "Motion",
     "MotionType",
-    "VoteType",
-    "GovernanceEngine",
+    "VoteType"
 ]

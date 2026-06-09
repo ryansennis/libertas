@@ -8,11 +8,13 @@ from unittest.mock import Mock, patch, MagicMock
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from libertas.tools.economic_tools import EconomicTools, get_economic_tool_definitions
-from libertas.organization.worker import Worker, WorkerConfig
-from libertas.organization.pod import Pod, PodConfig
+from libertas.economy.production import ProductionJob
 from libertas.organization.federation import Federation
-from libertas.economy import Resource, Recipe, ProductionStep, StepType, ResourceRegistry, RecipeRegistry
+from libertas.organization.pod import Pod, PodConfig
+from libertas.organization.worker import Worker, WorkerConfig
+from libertas.resources import Material, Tool, Recipe, ProductionStep, StepType, ResourceRegistry
+from libertas.tests.conftest import resource_registry, basic_federation, basic_pod_config, basic_worker_config
+from libertas.tools.economic_tools import EconomicTools, get_economic_tool_definitions
 
 LLM_MODEL = "ollama/tinyllama"
 
@@ -21,83 +23,10 @@ class TestEconomicTools(unittest.TestCase):
     """Test EconomicTools class."""
 
     def setUp(self):
-        # Create resource registry with test data
-        resource_registry = ResourceRegistry()
-        resource_registry.register(Resource(name="wood", base_value=10.0))
-        resource_registry.register(Resource(name="metal", base_value=20.0))
-        resource_registry.register(Resource(name="plank", base_value=15.0))
-        resource_registry.register(Resource(
-            name="hammer",
-            base_value=50.0,
-            is_tool=True,
-            durability=100.0,
-            required_skill="crafting"
-        ))
+        self.federation = basic_federation(basic_pod_config(basic_worker_config()))
 
-        # Create recipe registry with test data
-        recipe_registry = RecipeRegistry()
-        smelt_recipe = Recipe(
-            name="smelt",
-            steps=[
-                ProductionStep(
-                    name="smelt",
-                    step_type=StepType.PROCESSING,
-                    duration=5,
-                    inputs={"wood": 2.0},
-                    outputs={"metal": 1.0},
-                    required_skill="smelting",
-                    required_tool="hammer"
-                )
-            ],
-            description="Smelt metal from wood"
-        )
-        recipe_registry.register(smelt_recipe)
-
-        process_recipe = Recipe(
-            name="process_wood",
-            steps=[
-                ProductionStep(
-                    name="process",
-                    step_type=StepType.PROCESSING,
-                    duration=3,
-                    inputs={"wood": 1.0},
-                    outputs={"plank": 2.0},
-                    required_skill="crafting"
-                )
-            ],
-            description="Process wood into planks"
-        )
-        recipe_registry.register(process_recipe)
-
-        # Create worker config
-        worker_config = WorkerConfig(
-            name="worker_001",
-            reasoning=Mock,
-            llm_model=LLM_MODEL,
-            initial_currency=500.0,
-            initial_skills={"crafting": 2.0, "smelting": 1.5},
-            initial_tools=["hammer"]
-        )
-
-        # Create pod config with worker and initial inventory
-        pod_config = PodConfig(
-            name="pod_001",
-            workers=[worker_config],
-            initial_inventory={"wood": 100.0, "metal": 50.0}
-        )
-
-        # Create federation with pods and registries
-        self.federation = Federation(
-            pods=[pod_config],
-            resource_registry=resource_registry,
-            recipe_registry=recipe_registry,
-            initialize_market=True
-        )
-        self.federation.steps = 100  # Set step count for tests
-
-        # Get the worker from the created pod
-        pod = self.federation[0]  # First pod
-        self.worker = list(pod)[0]  # First worker (Pod is iterable AgentSet)
+        pod = self.federation[0]
+        self.worker = list(pod)[0]
         self.tools = EconomicTools(self.worker)
     
     def test_inspect_inventory(self):
@@ -304,8 +233,7 @@ class TestEconomicTools(unittest.TestCase):
             self.assertIn("error", data)
 
     def test_check_production_queue_with_active_jobs(self):
-        """Test check_production_queue appends active jobs (line 204)."""
-        from libertas.economy import ProductionJob, Recipe, ProductionStep, StepType
+        """Test check_production_queue appends active jobs."""
 
         pod = self.worker.pod
         # Create and add active job
@@ -322,8 +250,6 @@ class TestEconomicTools(unittest.TestCase):
 
     def test_transfer_to_pod_success(self):
         """Test successful resource transfer (lines 312-316)."""
-        from libertas.organization.pod import PodConfig
-        from libertas.organization import Federation
 
         # Create a second pod in the federation at setup time
         worker_config2 = WorkerConfig(name="worker_002", reasoning=Mock, llm_model=LLM_MODEL)
@@ -340,7 +266,6 @@ class TestEconomicTools(unittest.TestCase):
                 pod_config2
             ],
             resource_registry=self.federation.resource_registry,
-            recipe_registry=self.federation.recipe_registry
         )
 
         # Get worker from first pod
@@ -373,8 +298,7 @@ class TestEconomicTools(unittest.TestCase):
                 ),
                 pod_config2
             ],
-            resource_registry=self.federation.resource_registry,
-            recipe_registry=self.federation.recipe_registry
+            resource_registry=self.federation.resource_registry
         )
 
         # Get worker from first pod
@@ -412,8 +336,8 @@ class TestMarketTools(unittest.TestCase):
     def setUp(self):
         # Create resource registry with test data
         resource_registry = ResourceRegistry()
-        resource_registry.register(Resource(name="wood", base_value=10.0))
-        resource_registry.register(Resource(name="metal", base_value=20.0))
+        resource_registry.register(Material(name="wood", base_value=10.0))
+        resource_registry.register(Material(name="metal", base_value=20.0))
 
         # Create worker config
         worker_config = WorkerConfig(
@@ -651,36 +575,10 @@ class TestEconomicToolsEdgeCases(unittest.TestCase):
     """Test edge cases for EconomicTools."""
 
     def setUp(self):
-        # Create resource registry with test data
-        resource_registry = ResourceRegistry()
-        resource_registry.register(Resource(name="wood", base_value=10.0))
+        self.federation = basic_federation(basic_pod_config(basic_worker_config()))
 
-        # Create recipe registry
-        recipe_registry = RecipeRegistry()
-
-        # Create worker config
-        worker_config = WorkerConfig(
-            name="worker_001",
-            reasoning=Mock,
-            llm_model=LLM_MODEL
-        )
-
-        # Create pod config with worker
-        pod_config = PodConfig(
-            name="pod_001",
-            workers=[worker_config]
-        )
-
-        # Create federation with pods and registries
-        self.federation = Federation(
-            pods=[pod_config],
-            resource_registry=resource_registry,
-            recipe_registry=recipe_registry
-        )
-
-        # Get the worker from the created pod
-        pod = self.federation[0]  # First pod
-        self.worker = list(pod)[0]  # First worker (Pod is iterable AgentSet)
+        pod = self.federation[0]
+        self.worker = list(pod)[0]
         self.tools = EconomicTools(self.worker)
     
     def test_invent_recipe(self):

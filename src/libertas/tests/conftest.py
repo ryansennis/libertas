@@ -4,8 +4,7 @@
 import pytest
 from mesa_llm.reasoning.cot import CoTReasoning
 
-from libertas.economy import Recipe, ProductionStep, StepType, RecipeRegistry
-from libertas.resources import Material, Tool, ResourceRegistry
+from libertas.resources import Recipe, ProductionStep, StepType, Material, Tool, ResourceRegistry
 from libertas.organization import WorkerConfig, PodConfig, Federation
 
 
@@ -18,10 +17,24 @@ def resource_registry():
     wood = Material(name="wood", base_value=10.0)
     metal = Material(name="metal", base_value=20.0)
     plank = Material(name="plank", base_value=15.0)
+    process_recipe = Recipe(
+        name="process_wood",
+        steps=[
+            ProductionStep(
+                name="process",
+                step_type=StepType.PROCESSING,
+                duration=3,
+                inputs={"wood": 1.0},
+                outputs={"plank": 2.0},
+                required_skill="crafting"
+            )
+        ],
+        description="Process wood into planks"
+    )
 
     registry.register_material(wood)
     registry.register_material(metal)
-    registry.register_material(plank)
+    registry.register_resource_with_recipe(plank, process_recipe)
 
     # Tools (proper inheritance)
     hammer = Tool(
@@ -30,17 +43,6 @@ def resource_registry():
         durability=100,
         required_skill="crafting"
     )
-    registry.register_tool(hammer)
-
-    return registry
-
-
-@pytest.fixture
-def recipe_registry():
-    """Create a recipe registry with common test recipes."""
-    registry = RecipeRegistry()
-
-    # Smelt recipe
     smelt_recipe = Recipe(
         name="smelt",
         steps=[
@@ -56,24 +58,7 @@ def recipe_registry():
         ],
         description="Smelt metal from wood"
     )
-    registry.register(smelt_recipe)
-
-    # Process wood recipe
-    process_recipe = Recipe(
-        name="process_wood",
-        steps=[
-            ProductionStep(
-                name="process",
-                step_type=StepType.PROCESSING,
-                duration=3,
-                inputs={"wood": 1.0},
-                outputs={"plank": 2.0},
-                required_skill="crafting"
-            )
-        ],
-        description="Process wood into planks"
-    )
-    registry.register(process_recipe)
+    registry.register_resource_with_recipe(hammer, smelt_recipe)
 
     return registry
 
@@ -104,12 +89,11 @@ def basic_pod_config(basic_worker_config):
 
 
 @pytest.fixture
-def basic_federation(basic_pod_config, resource_registry, recipe_registry):
+def basic_federation(basic_pod_config, resource_registry):
     """Create a basic federation for testing (non-autonomous)."""
     fed = Federation(
         pods=[basic_pod_config],
         resource_registry=resource_registry,
-        recipe_registry=recipe_registry,
         initialize_market=True,
         enable_cognitive_loop=False  # Disable for basic tests
     )
@@ -121,14 +105,6 @@ def basic_federation(basic_pod_config, resource_registry, recipe_registry):
             worker.memory.display = False
 
     return fed
-
-
-@pytest.fixture
-def basic_worker(basic_federation):
-    """Get a worker from the basic federation."""
-    pod = basic_federation[0]
-    return list(pod)[0]
-
 
 @pytest.fixture
 def multi_pod_federation(resource_registry, recipe_registry):
@@ -164,6 +140,5 @@ def multi_pod_federation(resource_registry, recipe_registry):
     return Federation(
         pods=[pod1_config, pod2_config],
         resource_registry=resource_registry,
-        recipe_registry=recipe_registry,
         initialize_market=True
     )

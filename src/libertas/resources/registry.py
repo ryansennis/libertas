@@ -82,10 +82,6 @@ class ResourceRegistry:
         elif isinstance(resource, Consumable):
             self.register_consumable(resource)
 
-    # ============================================================================
-    # Resource + Recipe Registration (NEW - recommended API)
-    # ============================================================================
-
     def register_resource_with_recipe(
         self,
         resource: Resource,

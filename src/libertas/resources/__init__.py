@@ -4,39 +4,34 @@ This module provides the foundational resource system for Libertas.
 Resources and their production recipes are tightly coupled - every resource must have a recipe.
 """
 
-from .resource import Resource, ResourceTag
-from .material import Material
-from .tool import Tool
-from .equipment import Equipment
 from .consumable import Consumable, ConsumableType
-from .recipes import Recipe, ProductionStep, StepType
+from .equipment import Equipment
 from .inventory import (
     BaseInventory,
     WorkerInventory,
     PodInventory,
     FederationInventory
 )
+from .material import Material
+from .recipes import Recipe, ProductionStep, StepType
 from .registry import ResourceRegistry
+from .resource import Resource, ResourceTag
+from .tool import Tool
 
 __all__ = [
-    # Resource base class and tags
-    'Resource',
-    'ResourceTag',
-    # Resource types
-    'Material',
-    'Tool',
-    'Equipment',
+    'BaseInventory',
     'Consumable',
     'ConsumableType',
-    # Recipes
-    'Recipe',
-    'ProductionStep',
-    'StepType',
-    # Inventories
-    'BaseInventory',
-    'WorkerInventory',
-    'PodInventory',
+    'Equipment',
     'FederationInventory',
-    # Registry
+    'Material',
+    'PodInventory',
+    'ProductionStep',
+    'Recipe',
+    'Resource',
     'ResourceRegistry',
+    'ResourceTag',
+    'StepType',
+    'Tool',
+    'WorkerInventory'
 ]

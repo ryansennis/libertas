@@ -6,11 +6,11 @@ import pytest
 from unittest.mock import Mock, MagicMock
 
 from libertas.tools.organization_tools import OrganizationTools, get_organization_tool_definitions
-from libertas.organization.worker import Worker, WorkerConfig
-from libertas.organization.pod import Pod, PodConfig
+from libertas.organization.worker import WorkerConfig
+from libertas.organization.pod import PodConfig
 from libertas.organization.federation import Federation
 from libertas.cognitive import PersonalityTraits, Background
-from libertas.economy import Resource
+from libertas.resources import Material, Tool
 from mesa_llm.reasoning.cot import CoTReasoning
 
 LLM_MODEL = "ollama/tinyllama"
@@ -53,9 +53,9 @@ class TestOrganizationTools(unittest.TestCase):
         self.federation = Federation(pods=[pod_config], seed=42)
 
         # Register resources
-        self.federation.register_new_resource(Resource("wood", base_value=10.0))
-        self.federation.register_new_resource(Resource("stone", base_value=15.0))
-        self.federation.register_new_resource(Resource("hammer", base_value=50.0, is_tool=True))
+        self.federation.register_new_resource(Material("wood", base_value=10.0))
+        self.federation.register_new_resource(Material("stone", base_value=15.0))
+        self.federation.register_new_resource(Tool("hammer", base_value=50.0))
 
         self.pod = self.federation[0]
         self.alice = [w for w in self.pod if w.name == "Alice"][0]
