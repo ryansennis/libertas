@@ -1,6 +1,5 @@
 """Tests for CognitiveTools class."""
 
-import unittest
 import json
 import pytest
 from unittest.mock import Mock
@@ -16,10 +15,10 @@ LLM_MODEL = "ollama/tinyllama"
 
 
 @pytest.mark.unit
-class TestCognitiveTools(unittest.TestCase):
+class TestCognitiveTools:
     """Test CognitiveTools class."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         worker_config = WorkerConfig(
             name="TestWorker",
@@ -44,17 +43,17 @@ class TestCognitiveTools(unittest.TestCase):
 
     def test_initialization(self):
         """Test CognitiveTools initializes correctly."""
-        self.assertEqual(self.tools.worker, self.worker)
+        assert self.tools.worker == self.worker
 
     def test_view_my_goals_empty(self):
         """Test viewing goals when empty."""
         result = self.tools.view_my_goals()
         data = json.loads(result)
 
-        self.assertEqual(len(data["active_goals"]), 0)
-        self.assertEqual(len(data["completed_goals"]), 0)
-        self.assertEqual(len(data["abandoned_goals"]), 0)
-        self.assertEqual(data["total_active"], 0)
+        assert len(data["active_goals"]) == 0
+        assert len(data["completed_goals"]) == 0
+        assert len(data["abandoned_goals"]) == 0
+        assert data["total_active"] == 0
 
     def test_view_my_goals_with_goals(self):
         """Test viewing goals with some goals present."""
@@ -78,16 +77,16 @@ class TestCognitiveTools(unittest.TestCase):
         result = self.tools.view_my_goals()
         data = json.loads(result)
 
-        self.assertEqual(data["total_active"], 2)
-        self.assertEqual(len(data["active_goals"]), 2)
+        assert data["total_active"] == 2
+        assert len(data["active_goals"]) == 2
 
         # Check goal structure
         first_goal = data["active_goals"][0]
-        self.assertIn("goal_id", first_goal)
-        self.assertIn("type", first_goal)
-        self.assertIn("description", first_goal)
-        self.assertIn("status", first_goal)
-        self.assertIn("priority", first_goal)
+        assert "goal_id" in first_goal
+        assert "type" in first_goal
+        assert "description" in first_goal
+        assert "status" in first_goal
+        assert "priority" in first_goal
 
     def test_create_goal_valid(self):
         """Test creating a valid goal."""
@@ -100,13 +99,13 @@ class TestCognitiveTools(unittest.TestCase):
         )
         data = json.loads(result)
 
-        self.assertTrue(data["success"])
-        self.assertIn("goal_id", data)
-        self.assertEqual(data["goal_type"], "economic")
-        self.assertEqual(data["priority"], 0.7)
+        assert data["success"]
+        assert "goal_id" in data
+        assert data["goal_type"] == "economic"
+        assert data["priority"] == 0.7
 
         # Verify goal was added
-        self.assertEqual(len(self.worker.goals.active_goals), 1)
+        assert len(self.worker.goals.active_goals) == 1
 
     def test_create_goal_invalid_type(self):
         """Test creating goal with invalid type."""
@@ -116,9 +115,9 @@ class TestCognitiveTools(unittest.TestCase):
         )
         data = json.loads(result)
 
-        self.assertFalse(data["success"])
-        self.assertIn("error", data)
-        self.assertIn("Invalid goal_type", data["error"])
+        assert not (data["success"])
+        assert "error" in data
+        assert "Invalid goal_type" in data["error"]
 
     def test_create_goal_invalid_priority(self):
         """Test creating goal with invalid priority."""
@@ -129,9 +128,9 @@ class TestCognitiveTools(unittest.TestCase):
         )
         data = json.loads(result)
 
-        self.assertFalse(data["success"])
-        self.assertIn("error", data)
-        self.assertIn("Priority must be", data["error"])
+        assert not (data["success"])
+        assert "error" in data
+        assert "Priority must be" in data["error"]
 
     def test_update_goal_progress(self):
         """Test updating goal progress."""
@@ -148,10 +147,10 @@ class TestCognitiveTools(unittest.TestCase):
         result = self.tools.update_goal_progress("test_goal", 0.5)
         data = json.loads(result)
 
-        self.assertTrue(data["success"])
-        self.assertEqual(data["old_progress"], 0.0)
-        self.assertEqual(data["new_progress"], 0.5)
-        self.assertEqual(data["status"], "in_progress")
+        assert data["success"]
+        assert data["old_progress"] == 0.0
+        assert data["new_progress"] == 0.5
+        assert data["status"] == "in_progress"
 
     def test_update_goal_progress_complete(self):
         """Test updating goal progress to completion."""
@@ -161,22 +160,22 @@ class TestCognitiveTools(unittest.TestCase):
         result = self.tools.update_goal_progress("test_goal", 1.0)
         data = json.loads(result)
 
-        self.assertTrue(data["success"])
-        self.assertEqual(data["status"], "completed")
-        self.assertIn("completed", data["message"])
+        assert data["success"]
+        assert data["status"] == "completed"
+        assert "completed" in data["message"]
 
         # Verify goal moved to completed
-        self.assertEqual(len(self.worker.goals.active_goals), 0)
-        self.assertEqual(len(self.worker.goals.completed_goals), 1)
+        assert len(self.worker.goals.active_goals) == 0
+        assert len(self.worker.goals.completed_goals) == 1
 
     def test_update_goal_progress_not_found(self):
         """Test updating progress for non-existent goal."""
         result = self.tools.update_goal_progress("nonexistent", 0.5)
         data = json.loads(result)
 
-        self.assertFalse(data["success"])
-        self.assertIn("error", data)
-        self.assertIn("not found", data["error"])
+        assert not (data["success"])
+        assert "error" in data
+        assert "not found" in data["error"]
 
     def test_abandon_goal(self):
         """Test abandoning a goal."""
@@ -186,22 +185,22 @@ class TestCognitiveTools(unittest.TestCase):
         result = self.tools.abandon_goal("test_goal", "Changed priorities")
         data = json.loads(result)
 
-        self.assertTrue(data["success"])
-        self.assertEqual(data["goal_id"], "test_goal")
-        self.assertEqual(data["reason"], "Changed priorities")
-        self.assertEqual(data["status"], "abandoned")
+        assert data["success"]
+        assert data["goal_id"] == "test_goal"
+        assert data["reason"] == "Changed priorities"
+        assert data["status"] == "abandoned"
 
         # Verify goal moved to abandoned
-        self.assertEqual(len(self.worker.goals.active_goals), 0)
-        self.assertEqual(len(self.worker.goals.abandoned_goals), 1)
+        assert len(self.worker.goals.active_goals) == 0
+        assert len(self.worker.goals.abandoned_goals) == 1
 
     def test_abandon_goal_not_found(self):
         """Test abandoning non-existent goal."""
         result = self.tools.abandon_goal("nonexistent", "reason")
         data = json.loads(result)
 
-        self.assertFalse(data["success"])
-        self.assertIn("error", data)
+        assert not (data["success"])
+        assert "error" in data
 
     def test_revive_goal(self):
         """Test reviving an abandoned goal."""
@@ -212,34 +211,34 @@ class TestCognitiveTools(unittest.TestCase):
         result = self.tools.revive_goal("test_goal")
         data = json.loads(result)
 
-        self.assertTrue(data["success"])
-        self.assertEqual(data["goal_id"], "test_goal")
-        self.assertEqual(data["status"], "in_progress")
-        self.assertIn("revived", data["message"])
+        assert data["success"]
+        assert data["goal_id"] == "test_goal"
+        assert data["status"] == "in_progress"
+        assert "revived" in data["message"]
 
         # Verify goal moved back to active
-        self.assertEqual(len(self.worker.goals.active_goals), 1)
-        self.assertEqual(len(self.worker.goals.abandoned_goals), 0)
+        assert len(self.worker.goals.active_goals) == 1
+        assert len(self.worker.goals.abandoned_goals) == 0
 
     def test_revive_goal_not_found(self):
         """Test reviving non-existent goal."""
         result = self.tools.revive_goal("nonexistent")
         data = json.loads(result)
 
-        self.assertFalse(data["success"])
-        self.assertIn("error", data)
+        assert not (data["success"])
+        assert "error" in data
 
     def test_check_my_mood(self):
         """Test checking mood."""
         result = self.tools.check_my_mood()
         data = json.loads(result)
 
-        self.assertIn("happiness", data)
-        self.assertIn("stress", data)
-        self.assertIn("motivation", data)
-        self.assertIn("trust_in_leadership", data)
-        self.assertIn("solidarity_with_group", data)
-        self.assertIn("interpretation", data)
+        assert "happiness" in data
+        assert "stress" in data
+        assert "motivation" in data
+        assert "trust_in_leadership" in data
+        assert "solidarity_with_group" in data
+        assert "interpretation" in data
 
         # Check values are in valid range
         self.assertGreaterEqual(data["happiness"], 0.0)
@@ -252,7 +251,7 @@ class TestCognitiveTools(unittest.TestCase):
 
         interpretation = self.tools._interpret_mood(self.worker.mood)
 
-        self.assertIn("happy", interpretation.lower())
+        assert "happy" in interpretation.lower()
 
     def test_interpret_mood_stressed(self):
         """Test mood interpretation for stressed state."""
@@ -260,7 +259,7 @@ class TestCognitiveTools(unittest.TestCase):
 
         interpretation = self.tools._interpret_mood(self.worker.mood)
 
-        self.assertIn("stress", interpretation.lower())
+        assert "stress" in interpretation.lower()
 
     def test_recall_memory_market(self):
         """Test recalling market memories."""
@@ -271,9 +270,9 @@ class TestCognitiveTools(unittest.TestCase):
         result = self.tools.recall_memory("market", limit=5)
         data = json.loads(result)
 
-        self.assertIn("price_patterns", data)
-        self.assertIn("market_insights", data)
-        self.assertIn("wheat", data["price_patterns"])
+        assert "price_patterns" in data
+        assert "market_insights" in data
+        assert "wheat" in data["price_patterns"]
 
     def test_recall_memory_social(self):
         """Test recalling social memories."""
@@ -282,8 +281,8 @@ class TestCognitiveTools(unittest.TestCase):
         result = self.tools.recall_memory("social", limit=5)
         data = json.loads(result)
 
-        self.assertIn("trusted_workers", data)
-        self.assertIn("Alice", data["trusted_workers"])
+        assert "trusted_workers" in data
+        assert "Alice" in data["trusted_workers"]
 
     def test_recall_memory_production(self):
         """Test recalling production memories."""
@@ -292,8 +291,8 @@ class TestCognitiveTools(unittest.TestCase):
         result = self.tools.recall_memory("production", limit=5)
         data = json.loads(result)
 
-        self.assertIn("skill_mastery", data)
-        self.assertIn("farming", data["skill_mastery"])
+        assert "skill_mastery" in data
+        assert "farming" in data["skill_mastery"]
 
     def test_recall_memory_governance(self):
         """Test recalling governance memories."""
@@ -303,24 +302,24 @@ class TestCognitiveTools(unittest.TestCase):
         result = self.tools.recall_memory("governance", limit=5)
         data = json.loads(result)
 
-        self.assertIn("motion_outcomes", data)
-        self.assertIn("constitution_rules", data)
+        assert "motion_outcomes" in data
+        assert "constitution_rules" in data
 
     def test_recall_memory_no_match(self):
         """Test recalling with no matching topic."""
         result = self.tools.recall_memory("unknown_topic", limit=5)
         data = json.loads(result)
 
-        self.assertIn("error", data)
-        self.assertIn("No matching memories", data["error"])
+        assert "error" in data
+        assert "No matching memories" in data["error"]
 
     def test_view_recent_experiences_empty(self):
         """Test viewing experiences when empty."""
         result = self.tools.view_recent_experiences(limit=10)
         data = json.loads(result)
 
-        self.assertEqual(data["total_memories"], 0)
-        self.assertEqual(len(data["recent_experiences"]), 0)
+        assert data["total_memories"] == 0
+        assert len(data["recent_experiences"]) == 0
 
     def test_view_recent_experiences_with_data(self):
         """Test viewing experiences with data."""
@@ -335,33 +334,33 @@ class TestCognitiveTools(unittest.TestCase):
         result = self.tools.view_recent_experiences(limit=10)
         data = json.loads(result)
 
-        self.assertEqual(data["total_memories"], 5)
-        self.assertEqual(len(data["recent_experiences"]), 5)
+        assert data["total_memories"] == 5
+        assert len(data["recent_experiences"]) == 5
 
         exp = data["recent_experiences"][0]
-        self.assertIn("step", exp)
-        self.assertIn("observations_count", exp)
-        self.assertIn("mood_at_time", exp)
+        assert "step" in exp
+        assert "observations_count" in exp
+        assert "mood_at_time" in exp
 
 
 @pytest.mark.unit
-class TestCognitiveToolDefinitions(unittest.TestCase):
+class TestCognitiveToolDefinitions:
     """Test cognitive tool definitions."""
 
     def test_get_tool_definitions(self):
         """Test getting tool definitions."""
         defs = get_cognitive_tool_definitions()
 
-        self.assertIsInstance(defs, list)
-        self.assertGreater(len(defs), 0)
+        assert isinstance(defs, list)
+        assert len(defs) > 0
 
         # Check structure
         for tool_def in defs:
-            self.assertIn("type", tool_def)
-            self.assertEqual(tool_def["type"], "function")
-            self.assertIn("function", tool_def)
-            self.assertIn("name", tool_def["function"])
-            self.assertIn("description", tool_def["function"])
+            assert "type" in tool_def
+            assert tool_def["type"] == "function"
+            assert "function" in tool_def
+            assert "name" in tool_def["function"]
+            assert "description" in tool_def["function"]
 
     def test_tool_names(self):
         """Test that all expected tools are defined."""
@@ -380,7 +379,7 @@ class TestCognitiveToolDefinitions(unittest.TestCase):
         ]
 
         for expected in expected_tools:
-            self.assertIn(expected, tool_names)
+            assert expected in tool_names
 
     def test_create_goal_definition(self):
         """Test create_goal has proper parameter definitions."""
@@ -388,14 +387,14 @@ class TestCognitiveToolDefinitions(unittest.TestCase):
         tool = next(d for d in defs if d["function"]["name"] == "create_goal")
 
         params = tool["function"]["parameters"]
-        self.assertIn("goal_type", params["properties"])
-        self.assertIn("description", params["properties"])
-        self.assertIn("goal_type", params["required"])
-        self.assertIn("description", params["required"])
+        assert "goal_type" in params["properties"]
+        assert "description" in params["properties"]
+        assert "goal_type" in params["required"]
+        assert "description" in params["required"]
 
         # Check enum values
-        self.assertIn("enum", params["properties"]["goal_type"])
-        self.assertIn("economic", params["properties"]["goal_type"]["enum"])
+        assert "enum" in params["properties"]["goal_type"]
+        assert "economic" in params["properties"]["goal_type"]["enum"]
 
     def test_update_goal_progress_definition(self):
         """Test update_goal_progress has required parameters."""
@@ -403,8 +402,8 @@ class TestCognitiveToolDefinitions(unittest.TestCase):
         tool = next(d for d in defs if d["function"]["name"] == "update_goal_progress")
 
         params = tool["function"]["parameters"]
-        self.assertIn("goal_id", params["required"])
-        self.assertIn("progress", params["required"])
+        assert "goal_id" in params["required"]
+        assert "progress" in params["required"]
 
 
 if __name__ == "__main__":

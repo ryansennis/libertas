@@ -173,7 +173,7 @@ class TestWorker:
     def test_worker_creation(self):
         """Test basic worker creation."""
         assert self.worker.name == "worker_001"
-        assert self.worker.coordinate == (0, 0)
+        assert self.worker.coordinate == (0)
         assert self.worker.currency == 100.0
         assert self.worker.skills == {"crafting": 1.0, "forging": 0.5}
     
@@ -368,7 +368,7 @@ class TestWorkerEdgeCases:
         worker2 = Worker(
             self.federation,
             WorkerConfig(name="test_worker", reasoning=Mock, llm_model="ollama/tinyllama"),
-            coordinate=(0, 0)
+            coordinate=(0)
         )
         assert self.worker == worker2
 
@@ -1282,7 +1282,3 @@ class TestWorkerCognitiveLoop:
 
         # Goals should be accessible
         assert len(self.worker.goals.active_goals) > 0
-
-
-if __name__ == '__main__':
-    unittest.main()

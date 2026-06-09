@@ -1,5 +1,4 @@
 # tests/test_market.py
-import unittest
 import pytest
 import sys
 from pathlib import Path
@@ -11,7 +10,7 @@ from libertas.economy.market import Market, MarketOrder, MarketPrice
 
 
 @pytest.mark.unit
-class TestMarketPrice(unittest.TestCase):
+class TestMarketPrice:
     """Test MarketPrice class."""
     
     def test_price_creation(self):
@@ -22,10 +21,10 @@ class TestMarketPrice(unittest.TestCase):
             volatility=0.1
         )
         
-        self.assertEqual(price.current_price, 10.0)
-        self.assertEqual(price.base_price, 10.0)
-        self.assertEqual(price.volatility, 0.1)
-        self.assertEqual(price.trend, 0.0)
+        assert price.current_price == 10.0
+        assert price.base_price == 10.0
+        assert price.volatility == 0.1
+        assert price.trend == 0.0
     
     def test_price_history(self):
         """Test price history tracking."""
@@ -35,8 +34,8 @@ class TestMarketPrice(unittest.TestCase):
         price.add_history(10.5)
         price.add_history(9.8)
         
-        self.assertEqual(len(price.price_history), 3)
-        self.assertEqual(price.price_history, [10.0, 10.5, 9.8])
+        assert len(price.price_history) == 3
+        assert price.price_history == [10.0, 10.5, 9.8]
     
     def test_price_history_limit(self):
         """Test price history limited to 100 entries."""
@@ -45,11 +44,11 @@ class TestMarketPrice(unittest.TestCase):
         for i in range(150):
             price.add_history(10.0 + i * 0.1)
         
-        self.assertEqual(len(price.price_history), 100)
+        assert len(price.price_history) == 100
 
 
 @pytest.mark.unit
-class TestMarketOrder(unittest.TestCase):
+class TestMarketOrder:
     """Test MarketOrder class."""
     
     def test_order_creation(self):
@@ -65,22 +64,22 @@ class TestMarketOrder(unittest.TestCase):
             timestamp=100
         )
         
-        self.assertEqual(order.order_id, "order_1")
-        self.assertEqual(order.worker_id, "worker_001")
-        self.assertEqual(order.resource_name, "wood")
-        self.assertEqual(order.quantity, 100.0)
-        self.assertEqual(order.price_limit, 10.0)
-        self.assertEqual(order.order_type, "buy")
-        self.assertTrue(order.is_active)
-        self.assertEqual(order.filled_quantity, 0.0)
-        self.assertEqual(order.average_price, 0.0)
+        assert order.order_id == "order_1"
+        assert order.worker_id == "worker_001"
+        assert order.resource_name == "wood"
+        assert order.quantity == 100.0
+        assert order.price_limit == 10.0
+        assert order.order_type == "buy"
+        assert order.is_active
+        assert order.filled_quantity == 0.0
+        assert order.average_price == 0.0
 
 
 @pytest.mark.unit
-class TestMarket(unittest.TestCase):
+class TestMarket:
     """Test Market class."""
     
-    def setUp(self):
+    def setup_method(self):
         self.market = Market(random_seed=42)
         
         # Register test resources
@@ -89,31 +88,31 @@ class TestMarket(unittest.TestCase):
     
     def test_register_resource(self):
         """Test registering resources for trading."""
-        self.assertIn("wood", self.market.prices)
-        self.assertIn("metal", self.market.prices)
+        assert "wood" in self.market.prices
+        assert "metal" in self.market.prices
         
         price_info = self.market.prices["wood"]
-        self.assertEqual(price_info.base_price, 10.0)
-        self.assertEqual(price_info.volatility, 0.1)
+        assert price_info.base_price == 10.0
+        assert price_info.volatility == 0.1
     
     def test_get_current_price(self):
         """Test getting current market price."""
         price = self.market.get_current_price("wood")
-        self.assertEqual(price, 10.0)
+        assert price == 10.0
         
         # Unknown resource
         price = self.market.get_current_price("unknown")
-        self.assertEqual(price, 0.0)
+        assert price == 0.0
     
     def test_get_price_history(self):
         """Test getting price history."""
         history = self.market.get_price_history("wood")
-        self.assertEqual(len(history), 1)
-        self.assertEqual(history[0], 10.0)
+        assert len(history) == 1
+        assert history[0] == 10.0
         
         # Unknown resource
         history = self.market.get_price_history("unknown")
-        self.assertEqual(history, [])
+        assert history == []
     
     def test_place_order(self):
         """Test placing market orders."""
@@ -127,9 +126,9 @@ class TestMarket(unittest.TestCase):
             timestamp=100
         )
         
-        self.assertEqual(len(self.market.orders), 1)
-        self.assertEqual(order.order_type, "buy")
-        self.assertEqual(order.quantity, 50.0)
+        assert len(self.market.orders) == 1
+        assert order.order_type == "buy"
+        assert order.quantity == 50.0
     
     def test_price_updates(self):
         """Test that prices update with random walk."""
@@ -141,8 +140,8 @@ class TestMarket(unittest.TestCase):
         
         # Price should have changed (within bounds)
         new_price = self.market.get_current_price("wood")
-        self.assertNotEqual(initial_price, new_price)
-        self.assertGreater(new_price, 0.1)  # No negative prices
+        assert initial_price != new_price
+        assert new_price > 0.1  # No negative prices
     
     def test_mean_reversion(self):
         """Test that prices revert to base over time."""
@@ -155,7 +154,7 @@ class TestMarket(unittest.TestCase):
         
         # Price should still be reasonable (mean reversion)
         final_price = self.market.get_current_price("wood")
-        self.assertGreater(final_price, 5.0)
+        assert final_price > 5.0
         self.assertLess(final_price, 20.0)
     
     def test_market_shock(self):
@@ -172,11 +171,11 @@ class TestMarket(unittest.TestCase):
         new_price = self.market.get_current_price("wood")
         
         # Price should have changed significantly
-        self.assertNotEqual(initial_price, new_price)
+        assert initial_price != new_price
         
         # Filter shocks for wood resource only
         wood_shocks = [s for s in self.market.shock_history if s['resource'] == 'wood']
-        self.assertEqual(len(wood_shocks), 1)
+        assert len(wood_shocks) == 1
     
     def test_manual_shock(self):
         """Test applying manual price shock."""
@@ -185,9 +184,9 @@ class TestMarket(unittest.TestCase):
         self.market.apply_external_shock("wood", 2.0)
         
         new_price = self.market.get_current_price("wood")
-        self.assertEqual(new_price, initial_price * 2.0)
-        self.assertEqual(len(self.market.shock_history), 1)
-        self.assertTrue(self.market.shock_history[0].get("manual", False))
+        assert new_price == initial_price * 2.0
+        assert len(self.market.shock_history) == 1
+        assert self.market.shock_history[0].get("manual", False)
     
     def test_order_matching_buy_sell(self):
         """Test matching buy and sell orders."""
@@ -232,17 +231,17 @@ class TestMarket(unittest.TestCase):
         )
         
         # Should have one transaction
-        self.assertEqual(len(transactions), 1)
+        assert len(transactions) == 1
         
         tx = transactions[0]
-        self.assertEqual(tx["resource"], "wood")
-        self.assertEqual(tx["quantity"], 50.0)
-        self.assertEqual(tx["buyer_pod"], "pod_002")
-        self.assertEqual(tx["seller_pod"], "pod_001")
+        assert tx["resource"] == "wood"
+        assert tx["quantity"] == 50.0
+        assert tx["buyer_pod"] == "pod_002"
+        assert tx["seller_pod"] == "pod_001"
         
         # Check inventory updates
-        self.assertEqual(inventory["pod_001"]["wood"], 50.0)  # Sold 50
-        self.assertEqual(inventory["pod_002"]["wood"], 50.0)  # Bought 50
+        assert inventory["pod_001"]["wood"] == 50.0  # Sold 50
+        assert inventory["pod_002"]["wood"] == 50.0  # Bought 50
     
     def test_partial_fill(self):
         """Test partial order filling."""
@@ -273,14 +272,14 @@ class TestMarket(unittest.TestCase):
         transactions = self.market.process_market(101, get_inventory, set_inventory)
     
         # Only 30 should be traded
-        self.assertEqual(len(transactions), 1)
-        self.assertEqual(transactions[0]["quantity"], 30.0)
+        assert len(transactions) == 1
+        assert transactions[0]["quantity"] == 30.0
         
         # Both orders should still be active (partially filled)
         active_orders = [o for o in self.market.orders if o.is_active]
-        self.assertEqual(len(active_orders), 2)  # Both buy and sell orders active
-        self.assertEqual(active_orders[0].filled_quantity, 30.0)
-        self.assertEqual(active_orders[1].filled_quantity, 30.0)
+        assert len(active_orders) == 2  # Both buy and sell orders active
+        assert active_orders[0].filled_quantity == 30.0
+        assert active_orders[1].filled_quantity == 30.0
     
     def test_price_matching_priority(self):
         """Test that best prices match first."""
@@ -304,12 +303,12 @@ class TestMarket(unittest.TestCase):
         transactions = self.market.process_market(101, get_inventory, set_inventory)
         
         # Should have two transactions (both sells filled)
-        self.assertEqual(len(transactions), 2)
+        assert len(transactions) == 2
         
         # Cheaper sell should execute first (price 9.0)
         # But since both fill, we just check total quantity
         total_quantity = sum(tx["quantity"] for tx in transactions)
-        self.assertEqual(total_quantity, 100.0)
+        assert total_quantity == 100.0
     
     def test_cancel_order(self):
         """Test canceling an active order."""
@@ -319,14 +318,14 @@ class TestMarket(unittest.TestCase):
             price_limit=10.0, order_type="sell", timestamp=100
         )
         
-        self.assertTrue(self.market.cancel_order(order.order_id))
+        assert self.market.cancel_order(order.order_id)
         
         # Order should be inactive
         active_orders = [o for o in self.market.orders if o.is_active]
-        self.assertEqual(len(active_orders), 0)
+        assert len(active_orders) == 0
         
         # Cancel again should fail
-        self.assertFalse(self.market.cancel_order(order.order_id))
+        assert not (self.market.cancel_order(order.order_id))
     
     def test_get_worker_orders(self):
         """Test retrieving orders by worker."""
@@ -335,27 +334,27 @@ class TestMarket(unittest.TestCase):
         self.market.place_order("worker_002", "pod_002", "wood", 40.0, 9.0, "buy", 100)
         
         worker_orders = self.market.get_worker_orders("worker_001")
-        self.assertEqual(len(worker_orders), 2)
+        assert len(worker_orders) == 2
         
         worker_orders = self.market.get_worker_orders("worker_002")
-        self.assertEqual(len(worker_orders), 1)
+        assert len(worker_orders) == 1
     
     def test_get_market_summary(self):
         """Test getting market summary."""
         summary = self.market.get_market_summary()
         
-        self.assertIn("prices", summary)
-        self.assertIn("wood", summary["prices"])
-        self.assertIn("metal", summary["prices"])
-        self.assertEqual(summary["active_orders"], 0)
-        self.assertEqual(summary["total_shocks"], 0)
+        assert "prices" in summary
+        assert "wood" in summary["prices"]
+        assert "metal" in summary["prices"]
+        assert summary["active_orders"] == 0
+        assert summary["total_shocks"] == 0
 
 
 @pytest.mark.unit
-class TestMarketEdgeCases(unittest.TestCase):
+class TestMarketEdgeCases:
     """Test edge cases for market system."""
     
-    def setUp(self):
+    def setup_method(self):
         self.market = Market(random_seed=42)
         self.market.register_resource("wood", base_price=10.0)
     
@@ -375,8 +374,8 @@ class TestMarketEdgeCases(unittest.TestCase):
         
         transactions = self.market.process_market(101, get_inventory, set_inventory)
         
-        self.assertEqual(len(transactions), 0)
-        self.assertEqual(len([o for o in self.market.orders if o.is_active]), 2)
+        assert len(transactions) == 0
+        assert len([o for o in self.market.orders if o.is_active]) == 2
     
     def test_order_cleanup_on_completion(self):
         """Test that completed orders are removed."""
@@ -396,7 +395,7 @@ class TestMarketEdgeCases(unittest.TestCase):
         transactions = self.market.process_market(101, get_inventory, set_inventory)
         
         # Orders should be removed after full fill
-        self.assertEqual(len([o for o in self.market.orders if o.is_active]), 0)
+        assert len([o for o in self.market.orders if o.is_active]) == 0
     
     def test_resource_not_registered(self):
         """Test trading unregistered resource."""
@@ -414,7 +413,7 @@ class TestMarketEdgeCases(unittest.TestCase):
         transactions = self.market.process_market(101, get_inventory, set_inventory)
         
         # No price info, so no trades
-        self.assertEqual(len(transactions), 0)
+        assert len(transactions) == 0
 
     def test_process_market_mismatched_resources(self):
         """Test that orders for different resources don't match."""
@@ -443,7 +442,7 @@ class TestMarketEdgeCases(unittest.TestCase):
         transactions = self.market.process_market(101, get_inventory, set_inventory)
 
         # No trades should occur - different resources
-        self.assertEqual(len(transactions), 0)
+        assert len(transactions) == 0
 
 
 if __name__ == '__main__':

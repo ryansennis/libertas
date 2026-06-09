@@ -1,5 +1,4 @@
 # tests/unit/tools/test_governance_tools.py
-import unittest
 import sys
 import json
 import pytest
@@ -18,10 +17,10 @@ LLM_MODEL = "ollama/tinyllama"
 
 
 @pytest.mark.unit
-class TestGovernanceTools(unittest.TestCase):
+class TestGovernanceTools:
     """Test GovernanceTools class."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         # Create worker configs
         worker_config1 = WorkerConfig(
@@ -410,7 +409,7 @@ class TestGovernanceTools(unittest.TestCase):
 
 
 @pytest.mark.unit
-class TestGovernanceToolDefinitions(unittest.TestCase):
+class TestGovernanceToolDefinitions:
     """Test governance tool definitions."""
 
     def test_get_governance_tool_definitions(self):
@@ -488,10 +487,10 @@ class TestGovernanceToolDefinitions(unittest.TestCase):
 
 
 @pytest.mark.unit
-class TestGovernanceToolsEdgeCases(unittest.TestCase):
+class TestGovernanceToolsEdgeCases:
     """Test edge cases and coverage gaps."""
 
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
         # Create workers in different pods
         worker_config1 = WorkerConfig(

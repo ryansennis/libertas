@@ -1,5 +1,4 @@
 # tests/test_pod.py
-import unittest
 import pytest
 import sys
 from pathlib import Path
@@ -15,7 +14,7 @@ from libertas.resources import Recipe, ProductionStep, StepType, Resource
 LLM_MODEL = "ollama/qwen3"
 
 @pytest.mark.unit
-class TestPodConfig(unittest.TestCase):
+class TestPodConfig:
     """Test PodConfig class."""
     
     def test_config_creation(self):
@@ -32,10 +31,10 @@ class TestPodConfig(unittest.TestCase):
             initial_tools=["hammer"]
         )
         
-        self.assertEqual(config.name, "pod_001")
-        self.assertEqual(len(config.workers), 2)
-        self.assertEqual(config.initial_inventory, {"wood": 100.0})
-        self.assertEqual(config.initial_tools, ["hammer"])
+        assert config.name == "pod_001"
+        assert len(config.workers) == 2
+        assert config.initial_inventory == {"wood": 100.0}
+        assert config.initial_tools == ["hammer"]
     
     def test_config_serialization(self):
         """Test config serialization to/from JSON."""
@@ -45,7 +44,7 @@ class TestPodConfig(unittest.TestCase):
         config = PodConfig(name="pod_001", workers=worker_configs)
 
         json_str = config.to_json()
-        self.assertIsInstance(json_str, str)
+        assert isinstance(json_str, str)
 
         loaded = PodConfig.from_json(json_str)
 
@@ -62,11 +61,11 @@ class TestPodConfig(unittest.TestCase):
 
         try:
             result = config.to_json(filepath=filepath)
-            self.assertIsNone(result)  # Returns None when writing to file
+            assert result is None  # Returns None when writing to file
 
             # Read back
             loaded = PodConfig.from_json(None, filepath=filepath)
-            self.assertEqual(loaded.name, config.name)
+            assert loaded.name == config.name
         finally:
             import os
             if os.path.exists(filepath):
@@ -81,15 +80,15 @@ class TestPodConfig(unittest.TestCase):
         }
 
         loaded = PodConfig.from_json(config_dict)
-        self.assertEqual(loaded.name, "pod_001")
-        self.assertEqual(loaded.initial_inventory, {"wood": 50.0})
+        assert loaded.name == "pod_001"
+        assert loaded.initial_inventory == {"wood": 50.0}
 
     def test_config_from_json_invalid_type(self):
         """Test config from invalid data type."""
-        with self.assertRaises(ValueError) as cm:
+        with pytest.raises(ValueError) as cm:
             PodConfig.from_json(123)
 
-        self.assertIn("Unsupported data type", str(cm.exception))
+        assert "Unsupported data type" in str(cm.value)
 
     def test_config_from_json_file(self):
         """Test config from_json_file convenience method."""
@@ -105,17 +104,17 @@ class TestPodConfig(unittest.TestCase):
         try:
             config.to_json(filepath=filepath)
             loaded = PodConfig.from_json_file(filepath)
-            self.assertEqual(loaded.name, config.name)
+            assert loaded.name == config.name
         finally:
             import os
             if os.path.exists(filepath):
                 os.remove(filepath)
-        self.assertEqual(loaded.name, config.name)
-        self.assertEqual(len(loaded.workers), len(config.workers))
+        assert loaded.name == config.name
+        assert len(loaded.workers) == len(config.workers)
 
 
 @pytest.mark.unit
-class TestPodInitialization(unittest.TestCase):
+class TestPodInitialization:
     """Test Pod initialization with tools."""
 
     def test_pod_with_initial_tools(self):
@@ -123,7 +122,7 @@ class TestPodInitialization(unittest.TestCase):
         federation = Federation(pods=[], seed=42)
 
         # Register tools
-        hammer = Resource("hammer", base_value=10.0, is_tool=True, durability=100)
+        hammer = Tool("hammer", base_value=10.0, is_tool=True, durability=100)
         saw = Resource("saw", base_value=15.0, is_tool=True, durability=80)
         federation.register_new_resource(hammer)
         federation.register_new_resource(saw)
@@ -138,8 +137,8 @@ class TestPodInitialization(unittest.TestCase):
         pod = Pod(federation, pod_config, coordinate=(0, 0))
 
         # Should have tools in inventory
-        self.assertGreater(len(pod.inventory.instances.get("hammer", [])), 0)
-        self.assertGreater(len(pod.inventory.instances.get("saw", [])), 0)
+        assert len(pod.inventory.instances.get("hammer", []))
+        assert len(pod.inventory.instances.get("saw", []))
 
     def test_pod_with_unregistered_initial_tool(self):
         """Test pod initialization with unregistered tool."""
@@ -155,7 +154,7 @@ class TestPodInitialization(unittest.TestCase):
         pod = Pod(federation, pod_config, coordinate=(0, 0))
 
         # Should not have the nonexistent tool
-        self.assertEqual(len(pod.inventory.instances.get("nonexistent_tool", [])), 0)
+        assert len(pod.inventory.instances.get("nonexistent_tool", []))
 
     def test_pod_equality_different_type(self):
         """Test pod __eq__ with non-Pod object."""
@@ -164,16 +163,16 @@ class TestPodInitialization(unittest.TestCase):
         pod_config = PodConfig(name="test_pod", workers=worker_configs)
         pod = Pod(federation, pod_config, coordinate=(0, 0))
 
-        self.assertNotEqual(pod, "not a pod")
-        self.assertNotEqual(pod, 123)
-        self.assertNotEqual(pod, None)
+        assert pod != "not a pod"
+        assert pod != 123
+        assert pod != None
 
 
 @pytest.mark.unit
-class TestPodProperties(unittest.TestCase):
+class TestPodProperties:
     """Test Pod property accessors."""
 
-    def setUp(self):
+    def setup_method(self):
         self.federation = Federation(pods=[], seed=42)
         worker_configs = [WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL)]
         pod_config = PodConfig(name="test_pod", workers=worker_configs)
@@ -183,33 +182,33 @@ class TestPodProperties(unittest.TestCase):
         """Test pod position property getter."""
         position = self.pod.position
         # Position should be accessible
-        self.assertTrue(hasattr(self.pod, 'position'))
+        assert hasattr(self.pod, 'position')
 
     def test_position_setter(self):
         """Test pod position property setter."""
         self.pod.position = (20, 30)
         # Setting position should not raise error
-        self.assertTrue(hasattr(self.pod, 'position'))
+        assert hasattr(self.pod, 'position')
 
     def test_start_production_recipe_not_found(self):
         """Test start_production with non-existent recipe."""
         success, message = self.pod.start_production("nonexistent_recipe")
 
-        self.assertFalse(success)
-        self.assertIn("not found", message)
+        assert not (success)
+        assert "not found" in message
 
 
 @pytest.mark.unit
-class TestPod(unittest.TestCase):
+class TestPod:
     """Test Pod class with real Federation."""
 
-    def setUp(self):
+    def setup_method(self):
         # Create real federation
         self.federation = Federation(pods=[])
         
-        wood = Resource("wood", "system", base_value=1.0)
+        wood = Material("wood", "system", base_value=1.0)
         # Register wood resource
-        self.federation.register_new_resource(wood)
+        self.federation.resource_registry.register(wood)
         
         worker_configs = [
             WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL),
@@ -226,13 +225,13 @@ class TestPod(unittest.TestCase):
     
     def test_pod_creation(self):
         """Test basic pod creation."""
-        self.assertEqual(self.pod.name, "pod_001")
-        self.assertEqual(self.pod.coordinate, (0, 0))
-        self.assertEqual(self.pod.num_workers(), 2)
+        assert self.pod.name == "pod_001"
+        assert self.pod.coordinate == (0)
+        assert self.pod.num_workers() == 2
     
     def test_inventory_initialization(self):
         """Test inventory initialization from config."""
-        self.assertEqual(self.pod.inventory.get_quantity("wood"), 100.0)
+        assert self.pod.inventory.get_quantity("wood") == 100.0
     
     def test_hash_and_eq(self):
         """Test pod hashing and equality."""
@@ -240,10 +239,10 @@ class TestPod(unittest.TestCase):
         pod2_config = PodConfig(name="pod_002", workers=[])
         pod2 = Pod(self.federation, pod2_config, coordinate=(1, 0))
         
-        self.assertEqual(hash(pod1), hash(pod1))
-        self.assertNotEqual(hash(pod1), hash(pod2))
-        self.assertEqual(pod1, pod1)
-        self.assertNotEqual(pod1, pod2)
+        assert hash(pod1) == hash(pod1)
+        assert hash(pod1) != hash(pod2)
+        assert pod1 == pod1
+        assert pod1 != pod2
     
     def test_start_production(self):
         """Test starting production jobs."""
@@ -254,9 +253,9 @@ class TestPod(unittest.TestCase):
         
         success, result = self.pod.start_production("wood_processing", batch_size=2)
         
-        self.assertTrue(success)
-        self.assertIsNotNone(result)
-        self.assertEqual(len(self.pod.production_queue), 1)
+        assert success
+        assert result is not None
+        assert len(self.pod.production_queue) == 1
     
     def test_start_production_insufficient_inputs(self):
         """Test starting production with insufficient inputs."""
@@ -271,13 +270,13 @@ class TestPod(unittest.TestCase):
         
         success, result = self.pod.start_production("wood_intensive")
         
-        self.assertFalse(success)
-        self.assertIn("Need 1000.0 wood, have 100.0", result)
+        assert not (success)
+        assert "Need 1000.0 wood in have 100.0", result
     
     def test_get_inventory_summary(self):
         """Test getting inventory summary."""
         summary = self.pod.get_inventory_summary()
-        self.assertEqual(summary.get("wood"), 100.0)
+        assert summary.get("wood") == 100.0
     
     def test_transfer_to_pod(self):
         """Test transferring resources between pods."""
@@ -286,9 +285,9 @@ class TestPod(unittest.TestCase):
         
         success = self.pod.transfer_to_pod("wood", 30.0, target_pod)
         
-        self.assertTrue(success)
-        self.assertEqual(self.pod.inventory.get_quantity("wood"), 70.0)
-        self.assertEqual(target_pod.inventory.get_quantity("wood"), 30.0)
+        assert success
+        assert self.pod.inventory.get_quantity("wood") == 70.0
+        assert target_pod.inventory.get_quantity("wood") == 30.0
     
     def test_transfer_insufficient(self):
         """Test transfer with insufficient inventory."""
@@ -297,56 +296,56 @@ class TestPod(unittest.TestCase):
         
         success = self.pod.transfer_to_pod("wood", 200.0, target_pod)
         
-        self.assertFalse(success)
-        self.assertEqual(self.pod.inventory.get_quantity("wood"), 100.0)
+        assert not (success)
+        assert self.pod.inventory.get_quantity("wood") == 100.0
     
     def test_worker_management(self):
         """Test adding and removing workers."""
         # Register hammer resource for worker
-        tool = Resource("hammer", "system", base_value=10.0, is_tool=True)
-        self.federation.register_new_resource(tool)
+        tool = Tool("hammer", "system", base_value=10.0, is_tool=True)
+        self.federation.resource_registry.register(tool)
         
         worker = Worker(
             self.federation,
             WorkerConfig(name="w3", reasoning=Mock, llm_model=LLM_MODEL),
-            coordinate=(0, 0)
+            coordinate=(0)
         )
         
         initial_count = self.pod.num_workers()
         self.pod.add_worker(worker)
-        self.assertEqual(self.pod.num_workers(), initial_count + 1)
+        assert self.pod.num_workers() == initial_count + 1
         
         self.pod.remove_worker(worker)
-        self.assertEqual(self.pod.num_workers(), initial_count)
+        assert self.pod.num_workers() == initial_count
     
     def test_get_worker_by_name(self):
         """Test retrieving workers by ID."""
         first_worker = list(self.pod)[0]
         worker = self.pod.get_worker_by_name(first_worker.name)
-        self.assertIsNotNone(worker)
+        assert worker is not None
         if worker is not None:
-            self.assertEqual(worker.name, "w1")
+            assert worker.name == "w1"
         
-        self.assertIsNone(self.pod.get_worker_by_name("nonexistent"))
+        assert self.pod.get_worker_by_name("nonexistent" is None)
     
     def test_worker_network_fully_connected(self):
         """Test that worker network is fully connected."""
-        self.assertTrue(self.pod.is_fully_connected())
+        assert self.pod.is_fully_connected()
         
         # Register hammer resource for worker
-        tool = Resource("hammer", "system", base_value=10.0, is_tool=True)
-        self.federation.register_new_resource(tool)
+        tool = Tool("hammer", "system", base_value=10.0, is_tool=True)
+        self.federation.resource_registry.register(tool)
         
         # Add a new worker
         worker = Worker(
             self.federation,
             WorkerConfig(name="w3", reasoning=Mock, llm_model=LLM_MODEL),
-            coordinate=(0, 0)
+            coordinate=(0)
         )
         self.pod.add_worker(worker)
         
         # Should still be fully connected
-        self.assertTrue(self.pod.is_fully_connected())
+        assert self.pod.is_fully_connected()
     
     def test_get_worker_neighbors(self):
         """Test getting worker neighbors."""
@@ -356,7 +355,7 @@ class TestPod(unittest.TestCase):
             neighbors = self.pod.get_worker_neighbors(worker)
         
         # In a complete graph with 2 workers, each has 1 neighbor
-        self.assertEqual(len(neighbors), 1)
+        assert len(neighbors) == 1
     
     def test_set_worker_layout(self):
         """Test changing worker layout."""
@@ -370,9 +369,9 @@ class TestPod(unittest.TestCase):
     def test_pod_serialization(self):
         """Test pod serialization to JSON."""
         json_str = self.pod.to_json()
-        self.assertIsInstance(json_str, str)
+        assert isinstance(json_str, str)
         if json_str is not None:
-            self.assertIn("pod_001", json_str)
+            assert "pod_001" in json_str
 
     def test_start_production_inventory_remove_fails(self):
         """Test start_production when inventory.remove fails (line 181)."""
@@ -393,8 +392,8 @@ class TestPod(unittest.TestCase):
         # Mock inventory.remove to return False
         with patch.object(self.pod.inventory, 'remove', return_value=False):
             success, message = self.pod.start_production("make_planks", batch_size=1)
-            self.assertFalse(success)
-            self.assertIn("Failed to consume", message)
+            assert not (success)
+            assert "Failed to consume" in message
 
     def test_update_worker_coordinates_exception(self):
         """Test exception handling in _update_worker_coordinates (lines 322-330, 350-351)."""
@@ -412,21 +411,21 @@ class TestPod(unittest.TestCase):
 
             # Worker should have coordinates (from fallback)
             worker = list(self.pod)[0]
-            self.assertIsNotNone(worker.coordinate)
+            assert worker.coordinate is not None
 
 
 @pytest.mark.unit
-class TestPodProductionFailures(unittest.TestCase):
+class TestPodProductionFailures:
     """Test pod production failure scenarios."""
 
-    def setUp(self):
+    def setup_method(self):
         self.federation = Federation(pods=[], seed=42)
 
         # Register resources
-        wood = Resource("wood", base_value=1.0)
-        planks = Resource("planks", base_value=2.0)
-        self.federation.register_new_resource(wood)
-        self.federation.register_new_resource(planks)
+        wood = Material("wood", base_value=1.0)
+        planks = Material("planks", base_value=2.0)
+        self.federation.resource_registry.register(wood)
+        self.federation.resource_registry.register(planks)
 
         # Register recipe
         recipe_step = ProductionStep(
@@ -458,15 +457,15 @@ class TestPodProductionFailures(unittest.TestCase):
         success, message = self.pod.start_production("make_planks", batch_size=1)
 
         # Should fail (either at can_start or remove)
-        self.assertFalse(success)
-        self.assertIn("wood", message.lower())
+        assert not (success)
+        assert "wood" in message.lower()
 
 
 @pytest.mark.unit
-class TestPodWorkerAccess(unittest.TestCase):
+class TestPodWorkerAccess:
     """Test pod worker access methods."""
 
-    def setUp(self):
+    def setup_method(self):
         self.federation = Federation(pods=[], seed=42)
         worker_configs = [
             WorkerConfig(name="w1", reasoning=Mock, llm_model=LLM_MODEL),
@@ -479,7 +478,7 @@ class TestPodWorkerAccess(unittest.TestCase):
         """Test get_worker_by_index with invalid index (lines 290-293)."""
         # Try index beyond range
         worker = self.pod.get_worker_by_index(999)
-        self.assertIsNone(worker)
+        assert worker is None
 
         # Note: negative indices might work in Python (wrapping around)
         # so we only test clearly out of range indices
@@ -495,7 +494,7 @@ class TestPodWorkerAccess(unittest.TestCase):
         # Should return early without error
         graph = nx.Graph()
         empty_pod._update_worker_coordinates(graph)
-        self.assertEqual(len(empty_pod), 0)
+        assert len(empty_pod) == 0
 
     def test_update_worker_coordinates_exception_fallback(self):
         """Test _update_worker_coordinates exception fallback (lines 322-330)."""
@@ -510,7 +509,7 @@ class TestPodWorkerAccess(unittest.TestCase):
 
         # Workers should have coordinates (circular fallback)
         for worker in self.pod:
-            self.assertIsNotNone(worker.coordinate)
+            assert worker.coordinate is not None
 
     def test_set_worker_layout_empty_pod(self):
         """Test set_worker_layout with empty pod (line 334)."""
@@ -520,7 +519,7 @@ class TestPodWorkerAccess(unittest.TestCase):
 
         # Should return early without error
         empty_pod.set_worker_layout("spring")
-        self.assertEqual(len(empty_pod), 0)
+        assert len(empty_pod) == 0
 
     def test_set_worker_layout_random(self):
         """Test set_worker_layout with random layout (line 341)."""
@@ -528,7 +527,7 @@ class TestPodWorkerAccess(unittest.TestCase):
 
         # Workers should have coordinates
         for worker in self.pod:
-            self.assertIsNotNone(worker.coordinate)
+            assert worker.coordinate is not None
 
     def test_set_worker_layout_kamada_kawai(self):
         """Test set_worker_layout with kamada_kawai layout (line 343)."""
@@ -536,22 +535,22 @@ class TestPodWorkerAccess(unittest.TestCase):
 
         # Workers should have coordinates (covers lines 343, 350-351)
         for worker in self.pod:
-            self.assertIsNotNone(worker.coordinate)
+            assert worker.coordinate is not None
 
     def test_get_worker_degrees(self):
         """Test get_worker_degrees method (line 371)."""
         degrees = self.pod.get_worker_degrees()
 
         # Should return a dict
-        self.assertIsInstance(degrees, dict)
+        assert isinstance(degrees, dict)
 
     def test_to_list(self):
         """Test to_list method (line 387)."""
         worker_list = self.pod.to_list()
 
         # Should return a list of workers
-        self.assertIsInstance(worker_list, list)
-        self.assertEqual(len(worker_list), 2)
+        assert isinstance(worker_list, list)
+        assert len(worker_list) == 2
 
     def test_pod_from_json(self):
         """Test Pod.from_json class method (lines 402-403)."""
@@ -571,8 +570,8 @@ class TestPodWorkerAccess(unittest.TestCase):
             # Create Pod from JSON file
             pod = Pod.from_json(self.federation, None, (0, 0), filepath=filepath)
 
-            self.assertEqual(pod.name, "test_pod")
-            self.assertEqual(len(pod), 1)
+            assert pod.name == "test_pod"
+            assert len(pod) == 1
         finally:
             import os
             if os.path.exists(filepath):
@@ -580,10 +579,10 @@ class TestPodWorkerAccess(unittest.TestCase):
 
 
 @pytest.mark.unit
-class TestPodEdgeCases(unittest.TestCase):
+class TestPodEdgeCases:
     """Test edge cases for Pod class."""
     
-    def setUp(self):
+    def setup_method(self):
         self.federation = Federation(pods=[])
     
     def test_empty_pod(self):
@@ -591,9 +590,9 @@ class TestPodEdgeCases(unittest.TestCase):
         config = PodConfig(name="empty_pod", workers=[])
         pod = Pod(self.federation, config, coordinate=(0, 0))
         
-        self.assertEqual(pod.num_workers(), 0)
-        self.assertTrue(pod.is_fully_connected())
-        self.assertEqual(len(pod.get_worker_network().nodes), 0)
+        assert pod.num_workers() == 0
+        assert pod.is_fully_connected()
+        assert len(pod.get_worker_network().nodes) == 0
     
     def test_pod_single_worker(self):
         """Test pod with single worker."""
@@ -601,8 +600,8 @@ class TestPodEdgeCases(unittest.TestCase):
         config = PodConfig(name="single_pod", workers=[worker_config])
         pod = Pod(self.federation, config, coordinate=(0, 0))
         
-        self.assertEqual(pod.num_workers(), 1)
-        self.assertTrue(pod.is_fully_connected())
+        assert pod.num_workers() == 1
+        assert pod.is_fully_connected()
     
     def test_pod_coordinate_update(self):
         """Test updating pod coordinates."""
@@ -610,7 +609,7 @@ class TestPodEdgeCases(unittest.TestCase):
         pod = Pod(self.federation, config, coordinate=(0, 0))
         
         pod.coordinate = (5, 10)
-        self.assertEqual(pod.coordinate, (5, 10))
+        assert pod.coordinate == (5, 10)
     
     def test_transfer_nonexistent_resource(self):
         """Test transferring non-existent resource."""
@@ -620,7 +619,7 @@ class TestPodEdgeCases(unittest.TestCase):
         pod2 = Pod(self.federation, config2, coordinate=(1, 0))
 
         success = pod1.transfer_to_pod("nonexistent", 10.0, pod2)
-        self.assertFalse(success)
+        assert not (success)
 
 
 if __name__ == '__main__':

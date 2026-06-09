@@ -1,5 +1,4 @@
 # tests/test_recipe.py
-import unittest
 import pytest
 import sys
 from pathlib import Path
@@ -15,7 +14,7 @@ from libertas.economy import ProductionJob
 
 
 @pytest.mark.unit
-class TestProductionStep(unittest.TestCase):
+class TestProductionStep:
     """Test ProductionStep class."""
     
     def test_step_creation(self):
@@ -28,11 +27,11 @@ class TestProductionStep(unittest.TestCase):
             outputs={"planks": 1}
         )
         
-        self.assertEqual(step.name, "cut_wood")
-        self.assertEqual(step.step_type, StepType.PROCESSING)
-        self.assertEqual(step.duration, 10)
-        self.assertEqual(step.inputs, {"wood": 2})
-        self.assertEqual(step.outputs, {"planks": 1})
+        assert step.name == "cut_wood"
+        assert step.step_type == StepType.PROCESSING
+        assert step.duration == 10
+        assert step.inputs == {"wood": 2}
+        assert step.outputs == {"planks": 1}
     
     def test_step_with_requirements(self):
         """Test step with tool and skill requirements."""
@@ -45,9 +44,9 @@ class TestProductionStep(unittest.TestCase):
             required_skill_level=2.0
         )
         
-        self.assertEqual(step.required_tool, "hammer")
-        self.assertEqual(step.required_skill, "crafting")
-        self.assertEqual(step.required_skill_level, 2.0)
+        assert step.required_tool == "hammer"
+        assert step.required_skill == "crafting"
+        assert step.required_skill_level == 2.0
     
     def test_can_perform(self):
         """Test checking if worker can perform a step."""
@@ -61,22 +60,22 @@ class TestProductionStep(unittest.TestCase):
         
         # Worker with insufficient skill
         can_perform, reason = step.can_perform({"expertise": 2.0}, False)
-        self.assertFalse(can_perform)
-        self.assertIn("Need expertise level 3.0", reason)
+        assert not (can_perform)
+        assert "Need expertise level 3.0" in reason
         
         # Worker with sufficient skill
         can_perform, reason = step.can_perform({"expertise": 4.0}, False)
-        self.assertTrue(can_perform)
+        assert can_perform
         
         # Step requiring tool
         step.required_tool = "hammer"
         can_perform, reason = step.can_perform({"expertise": 4.0}, False)
-        self.assertFalse(can_perform)
-        self.assertIn("Need tool: hammer", reason)
+        assert not (can_perform)
+        assert "Need tool: hammer" in reason
         
         # Worker with tool
         can_perform, reason = step.can_perform({"expertise": 4.0}, True)
-        self.assertTrue(can_perform)
+        assert can_perform
     
     def test_step_serialization(self):
         """Test step serialization."""
@@ -92,17 +91,17 @@ class TestProductionStep(unittest.TestCase):
         data = original.to_dict()
         restored = ProductionStep.from_dict(data)
         
-        self.assertEqual(restored.name, original.name)
-        self.assertEqual(restored.step_type, original.step_type)
-        self.assertEqual(restored.duration, original.duration)
-        self.assertEqual(restored.quality_threshold, original.quality_threshold)
+        assert restored.name == original.name
+        assert restored.step_type == original.step_type
+        assert restored.duration == original.duration
+        assert restored.quality_threshold == original.quality_threshold
 
 
 @pytest.mark.unit
-class TestRecipe(unittest.TestCase):
+class TestRecipe:
     """Test Recipe class."""
     
-    def setUp(self):
+    def setup_method(self):
         self.steps = [
             ProductionStep(name="step1", duration=5, inputs={"a": 1}, outputs={"b": 1},
             step_type=StepType.QUALITY_CHECK),
@@ -113,14 +112,14 @@ class TestRecipe(unittest.TestCase):
     
     def test_recipe_creation(self):
         """Test basic recipe creation."""
-        self.assertEqual(self.recipe.name, "test_recipe")
-        self.assertEqual(len(self.recipe.steps), 2)
-        self.assertEqual(self.recipe.total_duration, 8)
+        assert self.recipe.name == "test_recipe"
+        assert len(self.recipe.steps) == 2
+        assert self.recipe.total_duration == 8
     
     def test_aggregated_inputs_outputs(self):
         """Test input/output aggregation."""
-        self.assertEqual(self.recipe.total_inputs, {"a": 1, "b": 1})
-        self.assertEqual(self.recipe.total_outputs, {"b": 1, "c": 1})
+        assert self.recipe.total_inputs == {"a": 1, "b": 1}
+        assert self.recipe.total_outputs == {"b": 1, "c": 1}
     
     def test_requirements_detection(self):
         """Test detection of required tools and skills."""
@@ -137,32 +136,32 @@ class TestRecipe(unittest.TestCase):
         
         recipe = Recipe(name="complex", steps=[step_with_tool, step_with_skill])
         
-        self.assertIn("hammer", recipe.requires_tools)
-        self.assertIn("crafting", recipe.requires_skills)
+        assert "hammer" in recipe.requires_tools
+        assert "crafting" in recipe.requires_skills
     
     def test_get_step(self):
         """Test retrieving steps by index."""
         step = self.recipe.get_step(0)
         if step:
-            self.assertEqual(step.name, "step1")
+            assert step.name == "step1"
         
-        self.assertIsNone(self.recipe.get_step(10))
+        assert self.recipe.get_step(10) is None
     
     def test_can_start(self):
         """Test checking if recipe can be started with available inputs."""
         # Sufficient inputs
         can_start, reason = self.recipe.can_start({"a": 5, "b": 5})
-        self.assertTrue(can_start)
+        assert can_start
         
         # Insufficient inputs
         can_start, reason = self.recipe.can_start({"a": 0})
-        self.assertFalse(can_start)
-        self.assertIn("Need 1 a", reason)
+        assert not (can_start)
+        assert "Need 1 a" in reason
     
     def test_requires_parallel_coordination(self):
         """Test detection of parallel steps."""
         # No parallel steps
-        self.assertFalse(self.recipe.requires_parallel_coordination())
+        assert not (self.recipe.requires_parallel_coordination())
         
         # Add parallel step
         parallel_step = ProductionStep(
@@ -171,23 +170,23 @@ class TestRecipe(unittest.TestCase):
             step_type=StepType.QUALITY_CHECK
         )
         recipe = Recipe(name="parallel_recipe", steps=[parallel_step])
-        self.assertTrue(recipe.requires_parallel_coordination())
+        assert recipe.requires_parallel_coordination()
     
     def test_recipe_serialization(self):
         """Test recipe serialization."""
         data = self.recipe.to_dict()
         restored = Recipe.from_dict(data)
         
-        self.assertEqual(restored.name, self.recipe.name)
-        self.assertEqual(len(restored.steps), len(self.recipe.steps))
-        self.assertEqual(restored.total_duration, self.recipe.total_duration)
+        assert restored.name == self.recipe.name
+        assert len(restored.steps) == len(self.recipe.steps)
+        assert restored.total_duration == self.recipe.total_duration
 
 
 @pytest.mark.unit
-class TestProductionJob(unittest.TestCase):
+class TestProductionJob:
     """Test ProductionJob class."""
     
-    def setUp(self):
+    def setup_method(self):
         steps = [
             ProductionStep(name="step1", duration=5, outputs={"output": 1},
             step_type=StepType.QUALITY_CHECK),
@@ -205,50 +204,50 @@ class TestProductionJob(unittest.TestCase):
             batch_size=2
         )
         
-        self.assertEqual(job.recipe.name, "test")
-        self.assertEqual(job.started_by, "worker_001")
-        self.assertEqual(job.batch_size, 2)
-        self.assertTrue(job.is_active)
-        self.assertEqual(job.current_step_index, 0)
+        assert job.recipe.name == "test"
+        assert job.started_by == "worker_001"
+        assert job.batch_size == 2
+        assert job.is_active
+        assert job.current_step_index == 0
     
     def test_assign_worker(self):
         """Test assigning worker to job."""
         job = ProductionJob(recipe=self.recipe)
-        job.assign_worker("worker_001", 0)
+        job.assign_worker("worker_001")
         
-        self.assertEqual(job.assigned_worker_id, "worker_001")
-        self.assertEqual(job.current_step_index, 0)
+        assert job.assigned_worker_id == "worker_001"
+        assert job.current_step_index == 0
     
     def test_step_completion(self):
         """Test completing production steps."""
         job = ProductionJob(recipe=self.recipe, batch_size=1)
-        job.assign_worker("worker_001", 0)
+        job.assign_worker("worker_001")
         
         # Complete first step
-        self.assertEqual(job.complete_step(10), {"output": 1})
-        self.assertEqual(len(job.completed_steps), 1)
-        self.assertEqual(job.current_step_index, 1)
+        assert job.complete_step(10) == {"output": 1}
+        assert len(job.completed_steps) == 1
+        assert job.current_step_index == 1
         
         # Not complete yet
-        self.assertFalse(job.is_complete())
+        assert not (job.is_complete())
         
         # Complete second step
         job.assign_worker("worker_001", 1)
-        self.assertEqual(job.complete_step(15), {"output": 1})
-        self.assertTrue(job.is_complete())
-        self.assertFalse(job.is_active)
+        assert job.complete_step(15) == {"output": 1}
+        assert job.is_complete()
+        assert not (job.is_active)
     
     def test_get_progress(self):
         """Test progress calculation."""
         job = ProductionJob(recipe=self.recipe)
         
-        self.assertEqual(job.get_progress(), 0.0)
+        assert job.get_progress() == 0.0
         
         job.completed_steps = [0]
-        self.assertEqual(job.get_progress(), 0.5)
+        assert job.get_progress() == 0.5
         
         job.completed_steps = [0, 1]
-        self.assertEqual(job.get_progress(), 1.0)
+        assert job.get_progress() == 1.0
     
     def test_job_serialization(self):
         """Test job serialization."""
@@ -262,10 +261,10 @@ class TestProductionJob(unittest.TestCase):
         data = job.to_dict()
         restored = ProductionJob.from_dict(data)
 
-        self.assertEqual(restored.recipe.name, job.recipe.name)
-        self.assertEqual(restored.started_by, job.started_by)
-        self.assertEqual(restored.batch_size, job.batch_size)
-        self.assertEqual(restored.completed_steps, job.completed_steps)
+        assert restored.recipe.name == job.recipe.name
+        assert restored.started_by == job.started_by
+        assert restored.batch_size == job.batch_size
+        assert restored.completed_steps == job.completed_steps
 
     def test_get_step_remaining_duration_no_current_step(self):
         """Test get_step_remaining_duration when no current step exists."""
@@ -274,7 +273,7 @@ class TestProductionJob(unittest.TestCase):
         job = ProductionJob(recipe=empty_recipe)
 
         # Should return 0 when no current step
-        self.assertEqual(job.get_step_remaining_duration(10), 0)
+        assert job.get_step_remaining_duration(10) == 0
 
     def test_consume_step_inputs_no_current_step(self):
         """Test consume_step_inputs when no current step exists."""
@@ -283,7 +282,7 @@ class TestProductionJob(unittest.TestCase):
         job = ProductionJob(recipe=empty_recipe)
 
         # Should return False when no current step
-        self.assertFalse(job.consume_step_inputs())
+        assert not (job.consume_step_inputs())
 
     def test_consume_step_inputs_with_batch_size(self):
         """Test consume_step_inputs multiplies by batch_size."""
@@ -303,7 +302,7 @@ class TestProductionJob(unittest.TestCase):
         job.consume_step_inputs()
 
         # Should be 2 wood * 3 batch_size = 6
-        self.assertEqual(job.inputs_consumed["wood"], 6)
+        assert job.inputs_consumed["wood"] == 6
 
     def test_get_step_outputs_no_current_step(self):
         """Test get_step_outputs when no current step exists."""
@@ -312,7 +311,7 @@ class TestProductionJob(unittest.TestCase):
         job = ProductionJob(recipe=empty_recipe)
 
         # Should return empty dict when no current step
-        self.assertEqual(job.get_step_outputs(), {})
+        assert job.get_step_outputs() == {}
 
     def test_get_progress_empty_recipe(self):
         """Test get_progress with empty recipe."""
@@ -320,27 +319,27 @@ class TestProductionJob(unittest.TestCase):
         job = ProductionJob(recipe=empty_recipe)
 
         # Should return 1.0 for empty recipe
-        self.assertEqual(job.get_progress(), 1.0)
+        assert job.get_progress() == 1.0
 
     def test_start_current_step(self):
         """Test start_current_step sets step_start_step."""
         job = ProductionJob(recipe=self.recipe)
 
         # Initially should be None
-        self.assertIsNone(job.step_start_step)
+        assert job.step_start_step is None
 
         # Start the step at simulation step 100
         job.start_current_step(100)
 
         # Should now be set
-        self.assertEqual(job.step_start_step, 100)
+        assert job.step_start_step == 100
 
     def test_get_step_remaining_duration_before_started(self):
         """Test get_step_remaining_duration before step is started."""
         job = ProductionJob(recipe=self.recipe)
 
         # step_start_step is None, should return full duration
-        self.assertEqual(job.get_step_remaining_duration(10), 5)
+        assert job.get_step_remaining_duration(10) == 5
 
     def test_get_step_remaining_duration_in_progress(self):
         """Test get_step_remaining_duration while step is in progress."""
@@ -348,10 +347,10 @@ class TestProductionJob(unittest.TestCase):
         job.start_current_step(100)
 
         # At step 102, elapsed is 2, remaining should be 5 - 2 = 3
-        self.assertEqual(job.get_step_remaining_duration(102), 3)
+        assert job.get_step_remaining_duration(102) == 3
 
         # At step 105, elapsed is 5, remaining should be 0
-        self.assertEqual(job.get_step_remaining_duration(105), 0)
+        assert job.get_step_remaining_duration(105) == 0
 
     def test_get_total_outputs(self):
         """Test get_total_outputs returns copy of outputs_produced."""
@@ -371,11 +370,11 @@ class TestProductionJob(unittest.TestCase):
 
         # Should have 2 * 3 = 6 products
         outputs = job.get_total_outputs()
-        self.assertEqual(outputs["product"], 6)
+        assert outputs["product"] == 6
 
         # Modifying returned dict shouldn't affect job
         outputs["product"] = 999
-        self.assertEqual(job.outputs_produced["product"], 6)
+        assert job.outputs_produced["product"] == 6
 
     def test_get_next_step(self):
         """Test get_next_step returns current uncompleted step."""
@@ -383,28 +382,28 @@ class TestProductionJob(unittest.TestCase):
 
         # Initially should be first step
         next_step = job.get_next_step()
-        self.assertIsNotNone(next_step)
+        assert next_step is not None
         if next_step:
-            self.assertEqual(next_step.name, "step1")
+            assert next_step.name == "step1"
 
         # Complete first step
         job.complete_step(10)
 
         # Should now be second step
         next_step = job.get_next_step()
-        self.assertIsNotNone(next_step)
+        assert next_step is not None
         if next_step:
-            self.assertEqual(next_step.name, "step2")
+            assert next_step.name == "step2"
 
         # Complete second step
         job.complete_step(20)
 
         # No more steps
-        self.assertIsNone(job.get_next_step())
+        assert job.get_next_step() is None
 
 
 @pytest.mark.unit
-class TestStartingRecipes(unittest.TestCase):
+class TestStartingRecipes:
     """Test get_starting_recipes function."""
 
     def test_get_starting_recipes(self):
@@ -414,24 +413,24 @@ class TestStartingRecipes(unittest.TestCase):
         recipes = get_starting_recipes()
 
         # Should return a list
-        self.assertIsInstance(recipes, list)
+        assert isinstance(recipes, list)
 
         # Should have some recipes
-        self.assertGreater(len(recipes), 0)
+        assert len(recipes) > 0
 
         # All items should be Recipe instances
         from libertas.economy import Recipe
         for recipe in recipes:
-            self.assertIsInstance(recipe, Recipe)
-            self.assertIsNotNone(recipe.name)
-            self.assertGreater(len(recipe.steps), 0)
+            assert isinstance(recipe, Recipe)
+            assert recipe.name is not None
+            assert len(recipe.steps) > 0
 
 
 @pytest.mark.unit
-class TestRecipeRegistry(unittest.TestCase):
+class TestRecipeRegistry:
     """Test RecipeRegistry class."""
     
-    def setUp(self):
+    def setup_method(self):
         self.registry = RecipeRegistry()
         self.recipe = Recipe(name="test", steps=[])
     
@@ -441,7 +440,7 @@ class TestRecipeRegistry(unittest.TestCase):
         
         retrieved = self.registry.get("test")
         if retrieved:
-            self.assertEqual(retrieved.name, "test")
+            assert retrieved.name == "test"
     
     def test_invent_recipe(self):
         """Test inventing new recipes."""
@@ -458,9 +457,9 @@ class TestRecipeRegistry(unittest.TestCase):
         
         new_recipe = self.registry.get("new_recipe")
         if new_recipe:
-            self.assertEqual(new_recipe.name, "new_recipe")
-        self.assertEqual(len(self.registry.invention_history), 1)
-        self.assertEqual(self.registry.invention_history[0]["inventor"], "worker_001")
+            assert new_recipe.name == "new_recipe"
+        assert len(self.registry.invention_history) == 1
+        assert self.registry.invention_history[0]["inventor"] == "worker_001"
     
     def test_list_recipes(self):
         """Test listing all recipes."""
@@ -468,7 +467,7 @@ class TestRecipeRegistry(unittest.TestCase):
         self.registry.register(Recipe(name="recipe2", steps=[]))
         
         recipes = self.registry.list_recipes()
-        self.assertEqual(len(recipes), 2)
+        assert len(recipes) == 2
     
     def test_get_by_category(self):
         """Test filtering recipes by category."""
@@ -477,22 +476,22 @@ class TestRecipeRegistry(unittest.TestCase):
         self.registry.register(Recipe(name="process1", steps=[], category="processing"))
         
         crafting = self.registry.get_by_category("crafting")
-        self.assertEqual(len(crafting), 2)
+        assert len(crafting) == 2
 
 @pytest.mark.unit
-class TestRecipeEdgeCases(unittest.TestCase):
+class TestRecipeEdgeCases:
     """Test edge cases for recipe system."""
 
     def test_empty_recipe(self):
         """Test recipe with no steps."""
         recipe = Recipe(name="empty", steps=[])
 
-        self.assertEqual(recipe.total_duration, 0)
-        self.assertEqual(recipe.total_inputs, {})
-        self.assertEqual(recipe.total_outputs, {})
+        assert recipe.total_duration == 0
+        assert recipe.total_inputs == {}
+        assert recipe.total_outputs == {}
 
         can_start, _ = recipe.can_start({})
-        self.assertTrue(can_start)
+        assert can_start
 
     def test_get_step_inputs_invalid_index(self):
         """Test get_step_inputs with invalid step index."""
@@ -510,8 +509,8 @@ class TestRecipeEdgeCases(unittest.TestCase):
         )
 
         # Invalid index should return empty dict
-        self.assertEqual(recipe.get_step_inputs(-1), {})
-        self.assertEqual(recipe.get_step_inputs(999), {})
+        assert recipe.get_step_inputs(-1) == {}
+        assert recipe.get_step_inputs(999) == {}
 
     def test_get_step_outputs_invalid_index(self):
         """Test get_step_outputs with invalid step index."""
@@ -529,8 +528,8 @@ class TestRecipeEdgeCases(unittest.TestCase):
         )
 
         # Invalid index should return empty dict
-        self.assertEqual(recipe.get_step_outputs(-1), {})
-        self.assertEqual(recipe.get_step_outputs(999), {})
+        assert recipe.get_step_outputs(-1) == {}
+        assert recipe.get_step_outputs(999) == {}
 
     def test_get_required_tools_for_step_invalid_index(self):
         """Test get_required_tools_for_step with invalid step index."""
@@ -547,8 +546,8 @@ class TestRecipeEdgeCases(unittest.TestCase):
         )
 
         # Invalid index should return None
-        self.assertIsNone(recipe.get_required_tools_for_step(-1))
-        self.assertIsNone(recipe.get_required_tools_for_step(999))
+        assert recipe.get_required_tools_for_step(-1 is None)
+        assert recipe.get_required_tools_for_step(999 is None)
     
     def test_job_with_zero_batch(self):
         """Test job with zero batch size."""
@@ -556,9 +555,9 @@ class TestRecipeEdgeCases(unittest.TestCase):
             step_type=StepType.QUALITY_CHECK)])
         job = ProductionJob(recipe=recipe, batch_size=0)
         
-        job.assign_worker("w1", 0)
+        job.assign_worker("w1")
         outputs = job.complete_step(10)
-        self.assertEqual(outputs, {})
+        assert outputs == {}
     
     def test_job_with_negative_batch(self):
         """Test job with negative batch size."""
@@ -566,10 +565,10 @@ class TestRecipeEdgeCases(unittest.TestCase):
             step_type=StepType.QUALITY_CHECK)])
         job = ProductionJob(recipe=recipe, batch_size=-1)
         
-        job.assign_worker("w1", 0)
+        job.assign_worker("w1")
         outputs = job.complete_step(10)
         # Should handle gracefully (outputs multiplied by negative)
-        self.assertEqual(outputs, {})
+        assert outputs == {}
     
     def test_complete_already_completed_step(self):
         """Test completing already completed step."""
@@ -581,7 +580,7 @@ class TestRecipeEdgeCases(unittest.TestCase):
         job.current_step_index = 1
         
         outputs = job.complete_step(10)
-        self.assertEqual(outputs, {})
+        assert outputs == {}
     
     def test_get_next_step_from_completed_job(self):
         """Test getting next step from completed job."""
@@ -592,7 +591,7 @@ class TestRecipeEdgeCases(unittest.TestCase):
         job.completed_steps = [0]
         job.current_step_index = 1
         
-        self.assertIsNone(job.get_next_step())
+        assert job.get_next_step() is None
 
 
 if __name__ == '__main__':
