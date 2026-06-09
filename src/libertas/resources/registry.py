@@ -71,9 +71,19 @@ class ResourceRegistry:
         if consumable.name not in self._consumables:
             self._consumables[consumable.name] = consumable
 
-    def register(self, resource: Resource) -> None:
-        """Register any resource type (polymorphic)."""
-        if isinstance(resource, Material):
+    def register(self, resource) -> None:
+        """Register any resource type or recipe (polymorphic)."""
+        from .recipes import Recipe
+
+        if isinstance(resource, Recipe):
+            # Register recipe directly
+            self._recipes_by_name[resource.name] = resource
+            # Add to recipes list for each output
+            for output_name in resource.total_outputs.keys():
+                if output_name not in self._recipes:
+                    self._recipes[output_name] = []
+                self._recipes[output_name].append(resource)
+        elif isinstance(resource, Material):
             self.register_material(resource)
         elif isinstance(resource, Tool):
             self.register_tool(resource)

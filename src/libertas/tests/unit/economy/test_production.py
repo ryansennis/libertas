@@ -8,7 +8,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from libertas.resources import (
     ProductionStep,
     StepType,
-    Recipe
+    Recipe,
+    ResourceRegistry
 )
 from libertas.economy import ProductionJob
 
@@ -429,9 +430,9 @@ class TestStartingRecipes:
 @pytest.mark.unit
 class TestRecipeRegistry:
     """Test RecipeRegistry class."""
-    
+
     def setup_method(self):
-        self.registry = RecipeRegistry()
+        self.registry = ResourceRegistry()
         self.recipe = Recipe(name="test", steps=[])
     
     def test_register_and_get(self):
@@ -594,5 +595,3 @@ class TestRecipeEdgeCases:
         assert job.get_next_step() is None
 
 
-if __name__ == '__main__':
-    unittest.main()

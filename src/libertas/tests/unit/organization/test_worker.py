@@ -532,6 +532,7 @@ class TestWorkerProductionEdgeCases:
         # Register resources and tools
         wood = Material("wood", base_value=1.0)
         planks = Material("planks", base_value=2.0)
+        hammer = Tool("hammer", base_value=50.0, durability=100)
         self.federation.resource_registry.register(wood)
         self.federation.resource_registry.register(planks)
         self.federation.resource_registry.register(hammer)

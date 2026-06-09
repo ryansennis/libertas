@@ -9,9 +9,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from libertas.organization.pod import Pod, PodConfig
 from libertas.organization.worker import Worker, WorkerConfig
 from libertas.organization.federation import Federation
-from libertas.resources import Recipe, ProductionStep, StepType, Resource
+from libertas.resources import Recipe, ProductionStep, StepType, Resource, Material, Tool
 
-LLM_MODEL = "ollama/qwen3"
+LLM_MODEL = "ollama/tinyllama"
 
 @pytest.mark.unit
 class TestPodConfig:
@@ -122,8 +122,8 @@ class TestPodInitialization:
         federation = Federation(pods=[], seed=42)
 
         # Register tools
-        hammer = Tool("hammer", base_value=10.0, is_tool=True, durability=100)
-        saw = Resource("saw", base_value=15.0, is_tool=True, durability=80)
+        hammer = Tool("hammer", base_value=10.0, durability=100)
+        saw = Resource("saw", base_value=15.0, durability=80)
         federation.register_new_resource(hammer)
         federation.register_new_resource(saw)
 
@@ -302,7 +302,7 @@ class TestPod:
     def test_worker_management(self):
         """Test adding and removing workers."""
         # Register hammer resource for worker
-        tool = Tool("hammer", "system", base_value=10.0, is_tool=True)
+        tool = Tool("hammer", "system", base_value=10.0, durability=100)
         self.federation.resource_registry.register(tool)
         
         worker = Worker(
@@ -333,7 +333,7 @@ class TestPod:
         assert self.pod.is_fully_connected()
         
         # Register hammer resource for worker
-        tool = Tool("hammer", "system", base_value=10.0, is_tool=True)
+        tool = Tool("hammer", "system", base_value=10.0, durability=100)
         self.federation.resource_registry.register(tool)
         
         # Add a new worker
@@ -622,5 +622,3 @@ class TestPodEdgeCases:
         assert not (success)
 
 
-if __name__ == '__main__':
-    unittest.main()

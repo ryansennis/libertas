@@ -13,7 +13,7 @@ def test_agent_reads_constitution_via_llm():
     worker_config = WorkerConfig(
         name="Alice",
         reasoning=CoTReasoning,
-        llm_model="ollama/mistral",
+        llm_model="ollama/tinyllama",
         initial_currency=1000.0
     )
 
@@ -36,7 +36,7 @@ def test_agent_checks_permissions():
     worker_config = WorkerConfig(
         name="Bob",
         reasoning=CoTReasoning,
-        llm_model="ollama/mistral",
+        llm_model="ollama/tinyllama",
         initial_currency=1000.0
     )
 
@@ -58,7 +58,7 @@ def test_agent_proposes_motion():
     worker_config = WorkerConfig(
         name="Charlie",
         reasoning=CoTReasoning,
-        llm_model="ollama/mistral",
+        llm_model="ollama/tinyllama",
         initial_currency=1000.0
     )
 
@@ -83,8 +83,8 @@ def test_agent_proposes_motion():
 def test_agent_votes_on_motion():
     """Agent votes on an active motion."""
     worker_configs = [
-        WorkerConfig(name="Alice", reasoning=CoTReasoning, llm_model="ollama/mistral"),
-        WorkerConfig(name="Bob", reasoning=CoTReasoning, llm_model="ollama/mistral")
+        WorkerConfig(name="Alice", reasoning=CoTReasoning, llm_model="ollama/tinyllama"),
+        WorkerConfig(name="Bob", reasoning=CoTReasoning, llm_model="ollama/tinyllama")
     ]
 
     pod_config = PodConfig(name="DemoCoop", workers=worker_configs)
@@ -113,8 +113,8 @@ def test_agent_votes_on_motion():
 def test_agent_lists_active_motions():
     """Agent lists all motions they can vote on."""
     worker_configs = [
-        WorkerConfig(name="Alice", reasoning=CoTReasoning, llm_model="ollama/mistral"),
-        WorkerConfig(name="Bob", reasoning=CoTReasoning, llm_model="ollama/mistral")
+        WorkerConfig(name="Alice", reasoning=CoTReasoning, llm_model="ollama/tinyllama"),
+        WorkerConfig(name="Bob", reasoning=CoTReasoning, llm_model="ollama/tinyllama")
     ]
 
     pod_config = PodConfig(name="VoteCoop", workers=worker_configs)
@@ -142,7 +142,7 @@ def test_agent_get_motion_details():
     worker_config = WorkerConfig(
         name="Alice",
         reasoning=CoTReasoning,
-        llm_model="ollama/mistral"
+        llm_model="ollama/tinyllama"
     )
 
     pod_config = PodConfig(name="DetailCoop", workers=[worker_config])

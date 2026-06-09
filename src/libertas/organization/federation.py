@@ -36,6 +36,8 @@ class Federation(mesa.Model, MutableSet[Pod]):
 
         # Initialize unified registry (resources + recipes)
         self.resource_registry = resource_registry or ResourceRegistry(base_labor_rate=base_labor_rate)
+        # Alias for backwards compatibility with tests
+        self.recipe_registry = self.resource_registry
 
         # Initialize governance
         self.constitution = constitution or Constitution.create_default_federation_constitution()
@@ -71,9 +73,10 @@ class Federation(mesa.Model, MutableSet[Pod]):
             self.market = market or Market(random_seed=seed if isinstance(seed, int) else None)
             
             # Register existing resources with market
+            from ..resources import Tool
             for resource_name in self.resource_registry.list_resources():
                 resource = self.resource_registry.get(resource_name)
-                if resource and not resource.is_tool:
+                if resource and not isinstance(resource, Tool):
                     self.market.register_resource(resource_name, resource.base_value)
         else:
             self.market = market

@@ -12,7 +12,6 @@ from libertas.organization.federation import Federation
 from libertas.organization.pod import Pod, PodConfig
 from libertas.organization.worker import Worker, WorkerConfig
 from libertas.resources import Material, Tool, Recipe, ProductionStep, StepType, ResourceRegistry
-from libertas.tests.conftest import resource_registry, basic_federation, basic_pod_config, basic_worker_config
 from libertas.tools.economic_tools import EconomicTools, get_economic_tool_definitions
 
 LLM_MODEL = "ollama/tinyllama"
@@ -21,9 +20,10 @@ LLM_MODEL = "ollama/tinyllama"
 class TestEconomicTools:
     """Test EconomicTools class."""
 
-    def setup_method(self):
-        self.federation = basic_federation(basic_pod_config(basic_worker_config()))
-
+    @pytest.fixture(autouse=True)
+    def setup(self, basic_federation):
+        """Setup test fixtures."""
+        self.federation = basic_federation
         pod = self.federation[0]
         self.worker = list(pod)[0]
         self.tools = EconomicTools(self.worker)
@@ -573,9 +573,10 @@ class TestEconomicToolsWorkerWithoutPod:
 class TestEconomicToolsEdgeCases:
     """Test edge cases for EconomicTools."""
 
-    def setup_method(self):
-        self.federation = basic_federation(basic_pod_config(basic_worker_config()))
-
+    @pytest.fixture(autouse=True)
+    def setup(self, basic_federation):
+        """Setup test fixtures."""
+        self.federation = basic_federation
         pod = self.federation[0]
         self.worker = list(pod)[0]
         self.tools = EconomicTools(self.worker)
@@ -616,5 +617,3 @@ class TestEconomicToolsEdgeCases:
         assert not (data["success"])
 
 
-if __name__ == '__main__':
-    unittest.main()

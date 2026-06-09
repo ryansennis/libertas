@@ -9,21 +9,21 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from libertas.organization.federation import Federation
 from libertas.organization.pod import PodConfig
 from libertas.organization.worker import WorkerConfig
-from libertas.resources import Recipe, ProductionStep, Resource, StepType
+from libertas.resources import Recipe, ProductionStep, Resource, StepType, Material, Tool
 
-LLM_MODEL = "ollama/functiongemma"
+LLM_MODEL = "ollama/tinyllama"
 
 @pytest.mark.unit
 class TestFederation:
     """Test Federation class with real objects."""
-    
+
     def setup_method(self):
         # Create worker configs
         self.worker_configs = [
             WorkerConfig(name=f"w{i}", reasoning=Mock, llm_model=LLM_MODEL)
             for i in range(3)
         ]
-        
+
         # Create pod configs - use 'name' not 'unique_id'
         self.pod_configs = [
             PodConfig(
@@ -33,12 +33,12 @@ class TestFederation:
             )
             for i in range(2)
         ]
-        
+
         self.federation = Federation(pods=self.pod_configs, seed=42)
-        
+
         wood = Material("wood", base_value=1.0)
 
-        test_resource = Resource("test_resource", base_value=5.0)
+        test_resource = Material("test_resource", base_value=5.0)
 
         # Register resources for testing
         self.federation.resource_registry.register(wood)
@@ -58,7 +58,7 @@ class TestFederation:
         pod = self.federation[0]
         assert pod is not None
         
-        with self.assertRaises(IndexError):
+        with pytest.raises(IndexError):
             _ = self.federation[10]
     
     def test_get_item_by_id(self):
@@ -68,7 +68,7 @@ class TestFederation:
         pod = self.federation[first_pod.name]
         assert pod.name == first_pod.name
         
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             _ = self.federation["nonexistent"]
     
     def test_iteration(self):
@@ -107,15 +107,15 @@ class TestFederation:
         self.federation.discard(pod)
         
         assert len(self.federation) == initial_count - 1
-        self.assertNotIn(pod, self.federation)
+        assert pod not in self.federation
     
     def test_remove_pod(self):
         """Test removing a pod (raises KeyError if not found)."""
         pod = self.federation[0]
         self.federation.remove(pod)
-        self.assertNotIn(pod, self.federation)
+        assert pod not in self.federation
         
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             self.federation.remove(pod)
     
     def test_get_pod_by_id(self):
@@ -171,7 +171,7 @@ class TestFederation:
         
     def test_register_new_resource(self):
         """Test inventing new resource."""
-        resource = Resource(
+        resource = Material(
             name="mithril",
             invented_by="worker_001",
             base_value=100.0
@@ -232,7 +232,7 @@ class TestFederation:
         self.federation.set_pod_layout("circular")
         self.federation.set_pod_layout("spring")
         
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             self.federation.set_pod_layout("invalid")
     
     def test_get_economic_summary(self):
@@ -271,7 +271,7 @@ class TestFederation:
         fed = Federation(pods=[pod_config], seed=42)
 
         # Register hammer as tool
-        hammer = Tool("hammer", base_value=10.0, is_tool=True, durability=100)
+        hammer = Tool("hammer", base_value=10.0, durability=100)
         fed.register_new_resource(hammer)
 
         # Add tools to pod inventory
@@ -324,17 +324,17 @@ class TestFederationWithCustomRegistries:
     """Test Federation with custom resource and recipe registries."""
     
     def setup_method(self):
-        from libertas.economy import ResourceRegistry, RecipeRegistry
+        from libertas.resources import ResourceRegistry
         
         self.custom_resource_registry = ResourceRegistry()
-        self.custom_recipe_registry = RecipeRegistry()
-        
+        self.custom_recipe_registry = self.custom_resource_registry  # Unified registry
+
         # Add custom resources
-        self.custom_resource_registry.register(Resource(name="custom_ore", base_value=5.0))
-        
+        self.custom_resource_registry.register(Material(name="custom_ore", base_value=5.0))
+
         # Add custom recipe
         step = ProductionStep(name="custom_step", duration=5, step_type=StepType.PROCESSING)
-        self.custom_recipe_registry.register(Recipe(name="custom_smelt", steps=[step]))
+        self.custom_resource_registry.register(Recipe(name="custom_smelt", steps=[step]))
         
         self.pod_configs = [
             PodConfig(name="pod_0", workers=[]),
@@ -343,8 +343,7 @@ class TestFederationWithCustomRegistries:
         
         self.federation = Federation(
             pods=self.pod_configs,
-            resource_registry=self.custom_resource_registry,
-            recipe_registry=self.custom_recipe_registry
+            resource_registry=self.custom_resource_registry
         )
     
     def test_custom_registries_used(self):
@@ -408,7 +407,7 @@ class TestFederationEdgeCases:
         fake_config = PodConfig(name="fake_pod", workers=[])
         fake_pod = Pod(self.empty_federation, fake_config, (0, 0))
 
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             self.single_pod_federation.remove(fake_pod)
 
     def test_register_new_resource_no_registry(self):
@@ -418,7 +417,7 @@ class TestFederationEdgeCases:
         fed.resource_registry = None
 
         # Try to register resource - should return False
-        resource = Resource("test", base_value=10.0)
+        resource = Material("test", base_value=10.0)
         result = fed.register_new_resource(resource)
         assert not (result)
 
@@ -484,7 +483,7 @@ class TestFederationEdgeCases:
         fed = Federation(pods=[pod_config], seed=42)
 
         # Register hammer as a tool
-        hammer = Tool("hammer", base_value=10.0, is_tool=True, durability=100)
+        hammer = Tool("hammer", base_value=10.0, durability=100)
         fed.register_new_resource(hammer)
 
         summary = fed.get_economic_summary()
@@ -548,7 +547,7 @@ class TestFederationEdgeCases:
 
         # Should have one pod left
         assert len(fed) == 1
-        self.assertNotIn(pod, fed)
+        assert pod not in fed
 
     def test_discard_nonexistent_pod(self):
         """Test discard with pod not in federation (should not raise)."""
@@ -573,7 +572,7 @@ class TestFederationEdgeCases:
         fed = Federation(pods=[pod_config], seed=42)
 
         # Register tool
-        hammer = Tool("hammer", base_value=10.0, is_tool=True, durability=100)
+        hammer = Tool("hammer", base_value=10.0, durability=100)
         fed.register_new_resource(hammer)
 
         summary = fed.get_economic_summary()
@@ -582,5 +581,3 @@ class TestFederationEdgeCases:
         assert "total_tools" in summary
 
 
-if __name__ == '__main__':
-    unittest.main()

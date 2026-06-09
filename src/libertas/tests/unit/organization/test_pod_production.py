@@ -5,10 +5,10 @@ import pytest
 from unittest.mock import Mock
 
 from libertas.organization import Pod, PodConfig, Worker, WorkerConfig, Federation
-from libertas.resources import Recipe, ProductionStep, StepType, Resource
+from libertas.resources import Recipe, ProductionStep, StepType, Resource, Material, Tool
 
 
-LLM_MODEL = "ollama/qwen3"
+LLM_MODEL = "ollama/tinyllama"
 
 
 @pytest.mark.unit
@@ -28,7 +28,7 @@ class TestPodProductionProcessing:
             Material("plank", "system", base_value=15.0)
         )
         self.federation.resource_registry.register(
-            Tool("hammer", "system", base_value=50.0, is_tool=True, durability=100.0)
+            Tool("hammer", "system", base_value=50.0, durability=100.0)
         )
 
         # Create workers with skills
@@ -422,5 +422,3 @@ class TestPodStepMethod:
         pod.step()
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

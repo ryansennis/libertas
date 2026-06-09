@@ -116,5 +116,3 @@ class TestMaterial:
         assert buy_price == expected
 
 
-if __name__ == "__main__":
-    unittest.main()

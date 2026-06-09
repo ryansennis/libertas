@@ -259,5 +259,3 @@ class TestOrganizationToolDefinitions:
         assert "worker_name" in params["required"]
 
 
-if __name__ == "__main__":
-    unittest.main()

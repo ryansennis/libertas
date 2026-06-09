@@ -495,11 +495,17 @@ class Worker(LLMAgent):
     # Status Methods
     def get_status(self) -> Dict[str, Any]:
         """Get worker's current status."""
+        # Build tool summary from inventory
+        tool_summary = {}
+        if hasattr(self.inventory, '_tools'):
+            for tool in self.inventory._tools.values():
+                tool_summary[tool.name] = tool_summary.get(tool.name, 0) + 1
+
         return {
             'name': self.name,
             'skills': self.skills.copy(),
             'equipped_tool': self.equipped_tool,
-            'tools': {name: len(tools) for name, tools in self.tools.items()},
+            'tools': tool_summary,
             'currency': self.currency,
             'current_job': self.current_job.job_id if self.current_job else None,
             'completed_jobs': len(self.completed_jobs),
@@ -508,13 +514,18 @@ class Worker(LLMAgent):
     
     def to_dict(self) -> Dict[str, Any]:
         """Serialize worker state."""
+        # Build tools dict grouped by name
+        tools_by_name = {}
+        if hasattr(self.inventory, '_tools'):
+            for tool in self.inventory._tools.values():
+                if tool.name not in tools_by_name:
+                    tools_by_name[tool.name] = []
+                tools_by_name[tool.name].append(tool.to_dict())
+
         return {
             'name': self.name,
             'skills': self.skills.copy(),
-            'tools': {
-                name: [tool.to_dict() for tool in tools]
-                for name, tools in self.tools.items()
-            },
+            'tools': tools_by_name,
             'equipped_tool': self.equipped_tool,
             'currency': self.currency,
             'completed_jobs': self.completed_jobs.copy(),
@@ -1163,7 +1174,8 @@ Respond in JSON format:
             if goal.target_metric == "currency":
                 return self.currency
             elif goal.target_metric == "tools":
-                return float(sum(len(tools) for tools in self.tools.values()))
+                # Count tools in inventory
+                return float(len(self.inventory) if hasattr(self, 'inventory') else 0)
 
         elif goal.goal_type == "social":
             if goal.target_metric == "avg_trust":

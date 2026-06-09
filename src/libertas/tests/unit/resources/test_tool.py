@@ -132,5 +132,3 @@ class TestTool:
         assert "cut_wood" in tool.enables_recipes
 
 
-if __name__ == "__main__":
-    unittest.main()

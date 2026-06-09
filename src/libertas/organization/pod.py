@@ -245,38 +245,31 @@ class Pod(AgentSet[Worker]):
             worker.step()
     
     def get_inventory_summary(self) -> Dict[str, float]:
-        """Get summary of current inventory.
+        """Get summary of current inventory."""
+        result = {}
 
-        During migration: use new system if available, fallback to old.
-        """
-        # Try new system first
-        if hasattr(self.inventory, 'materials') and self.inventory.materials:
-            result = {name: mat.quantity for name, mat in self.inventory.materials.items()}
-            # Also include consumables if present
-            if hasattr(self.inventory, 'consumables') and self.inventory.consumables:
-                for name, cons in self.inventory.consumables.items():
-                    result[name] = result.get(name, 0) + cons.quantity
-            return result
-        # Fallback to old system
-        return self.inventory.quantities.copy()
+        # Add materials
+        if hasattr(self.inventory, '_materials'):
+            for name, mat in self.inventory._materials.items():
+                result[name] = mat.quantity
+
+        # Add consumables
+        if hasattr(self.inventory, '_consumables'):
+            for name, cons in self.inventory._consumables.items():
+                result[name] = result.get(name, 0) + cons.quantity
+
+        return result
     
     def get_tools_summary(self) -> Dict[str, int]:
-        """Get summary of tools in inventory.
+        """Get summary of tools in inventory."""
+        tool_counts = {}
 
-        During migration: use new system if available, fallback to old.
-        """
-        # Try new system first
-        if hasattr(self.inventory, 'tools') and self.inventory.tools:
-            tool_counts = {}
-            for tool_id, tool in self.inventory.tools.items():
-                name = tool.info.name
+        if hasattr(self.inventory, '_tools'):
+            for tool_id, tool in self.inventory._tools.items():
+                name = tool.name  # Use tool.name directly, not tool.info.name
                 tool_counts[name] = tool_counts.get(name, 0) + 1
-            return tool_counts
-        # Fallback to old system
-        return {
-            name: len(tools)
-            for name, tools in self.inventory.instances.items()
-        }
+
+        return tool_counts
     
     def transfer_to_pod(self, resource_name: str, quantity: float, 
                        target_pod: 'Pod') -> bool:

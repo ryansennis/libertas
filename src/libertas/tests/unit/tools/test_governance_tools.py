@@ -602,5 +602,3 @@ class TestGovernanceToolsEdgeCases:
             assert "permission denied" in result_dict["error"].lower()
 
 
-if __name__ == "__main__":
-    unittest.main()

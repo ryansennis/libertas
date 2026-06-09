@@ -445,5 +445,3 @@ class TestMarketEdgeCases:
         assert len(transactions) == 0
 
 
-if __name__ == '__main__':
-    unittest.main()

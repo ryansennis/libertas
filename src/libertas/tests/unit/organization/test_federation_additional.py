@@ -5,10 +5,10 @@ import pytest
 from unittest.mock import Mock
 
 from libertas.organization import Federation, Pod, PodConfig, WorkerConfig
-from libertas.resources import Resource, Recipe, ProductionStep, StepType
+from libertas.resources import Resource, Recipe, ProductionStep, StepType, Material
 
 
-LLM_MODEL = "ollama/qwen3"
+LLM_MODEL = "ollama/tinyllama"
 
 
 @pytest.mark.unit
@@ -149,14 +149,14 @@ class TestFederationPodManagement:
 
         self.federation.remove(pod)
 
-        self.assertNotIn(pod, self.federation)
+        assert pod not in self.federation
 
     def test_remove_pod_that_doesnt_exist(self):
         """Test removing a pod that doesn't exist raises KeyError."""
         pod_config = PodConfig(name="pod1", workers=[])
         pod = Pod(self.federation, pod_config, coordinate=(0, 0))
 
-        with self.assertRaises(KeyError):
+        with pytest.raises(KeyError):
             self.federation.remove(pod)
 
     def test_set_pod_layout_empty_pods(self):
@@ -299,5 +299,3 @@ class TestFederationEconomicSummary:
         assert "wood" in summary["total_inventory"]
 
 
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
